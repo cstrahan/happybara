@@ -1,0 +1,5 @@
+dist/
+data/
+
+.cabal-sandbox/
+cabal.sandbox.config
