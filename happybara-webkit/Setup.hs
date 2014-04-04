@@ -9,6 +9,7 @@ import           Distribution.Verbosity
 import           System.Directory
 import           System.Environment
 import           System.Exit
+import           System.FilePath
 import           System.Info
 import           System.IO
 import           System.IO.Unsafe
@@ -63,6 +64,10 @@ path_to_binary =
       then "src/debug/webkit_server.exe"
       else "src/webkit_server"
 
+serverBin = if os == "mingw32"
+              then "webkit_server.exe"
+              else "webkit_server"
+
 build_all = do
     setCurrentDirectory "capybara-webkit"
 
@@ -84,9 +89,6 @@ customConfHook :: (GenericPackageDescription, HookedBuildInfo)
                -> ConfigFlags
                -> IO LocalBuildInfo
 customConfHook (pkg_descr0, pbi) cfg = do
-    let serverBin = if os == "mingw32"
-                      then "webkit_server.exe"
-                      else "webkit_server"
     let pkg_descr = pkg_descr0 {
             packageDescription = (packageDescription pkg_descr0) {
                 dataFiles = serverBin:(dataFiles . packageDescription $ pkg_descr0)
@@ -94,9 +96,19 @@ customConfHook (pkg_descr0, pbi) cfg = do
         }
     (confHook simpleUserHooks) (pkg_descr, pbi) cfg
 
+customPostInst :: Args -> InstallFlags -> PackageDescription -> LocalBuildInfo -> IO ()
+customPostInst x y pkgdesc lbi = do
+    -- Make sure the binary is executable
+    when (os /= "mingw32") $ do
+        let dirs = absoluteInstallDirs pkgdesc lbi NoCopyDest
+        let path = (datadir dirs) </> serverBin
+        sh "chmod" ["+x", path]
+    (postInst simpleUserHooks) x y pkgdesc lbi
+
 main :: IO ()
 main = do
     defaultMainWithHooks $ simpleUserHooks
         { confHook  = customConfHook
         , buildHook = customBuildHook
+        , postInst  = customPostInst
         }

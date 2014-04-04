@@ -14,7 +14,6 @@ import Network.HTTP.Types
 import Control.Monad.State
 import Control.Exception
 import Control.Applicative
-import Control.Monad.CatchIO
 import Control.Monad.Base
 import Control.Monad.Trans.Control
 
@@ -64,7 +63,7 @@ instance Exception AmbiguousElementException where
         cast a
 
 newtype Browser a = Browser (StateT Session IO a)
-    deriving (Functor, Applicative, Monad, MonadIO, MonadCatchIO)
+    deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadBase IO Browser where
     liftBase = Browser . liftBase
@@ -80,6 +79,12 @@ instance MonadBaseControl IO Browser where
 
 getSession :: Browser Session
 getSession = Browser $ get
+
+runBrowser :: Browser a -> IO a
+runBrowser (Browser m) = do
+    serverPath <- defaultServerPath
+    sess <- mkSession serverPath
+    evalStateT m sess
 
 instance Driver Browser where
     data Node Browser = BrowserNode !Text

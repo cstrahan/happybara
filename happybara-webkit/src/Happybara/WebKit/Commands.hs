@@ -43,8 +43,8 @@ command sess cmd args = do
     BS.hPutStrLn h cmd
     BS.hPutStrLn h (BS.pack . show . length $ args)
     forM_ args $ \arg -> do
-        BS.putStrLn (BS.pack . show . BS.length $ arg)
-        BS.putStr arg
+        BS.hPutStrLn h (BS.pack . show . BS.length $ arg)
+        BS.hPutStr h arg
     hFlush h
     check
     readResponse
@@ -60,7 +60,6 @@ command sess cmd args = do
         if len > 0
           then BS.hGet h len
           else return ""
-
 
 invoke :: Session -> NodeHandle -> ByteString -> [ByteString] -> IO ByteString
 invoke sess h name args =

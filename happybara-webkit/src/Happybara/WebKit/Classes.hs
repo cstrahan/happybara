@@ -16,8 +16,10 @@ import Data.Aeson
 import Control.Monad.Trans.Control
 import Control.Applicative
 import Control.Monad
+import Control.Concurrent
 
 import System.IO
+import System.FilePath
 import System.Timeout
 import System.Process
 
@@ -27,7 +29,7 @@ import Network.HTTP.Types (Header, ResponseHeaders, Status)
 
 import System.Info (os)
 
-import Paths_happybara_webkit (getDataFileName)
+import Paths_happybara_webkit (getDataFileName, getLibexecDir)
 
 data Session = Session { sock       :: Socket
                        , handle     :: Handle
@@ -89,7 +91,6 @@ class MonadBaseControl IO m => Driver m where
 
 webkitServerStartTimeout = 15 * 1000000
 
-defaultServerPath :: IO FilePath
 defaultServerPath = getDataFileName $ if os == "mingw32"
                                         then "webkit_server.exe"
                                         else "webkit_server"
@@ -107,7 +108,7 @@ mkSession serverPath = do
         s <- socket (addrFamily addr) Stream defaultProtocol
         setSocketOption s KeepAlive 1
         connect s (addrAddress addr)
-        h <- socketToHandle s WriteMode
+        h <- socketToHandle s ReadWriteMode
         hSetBuffering h (BlockBuffering Nothing)
         return (s, h)
     parsePort :: String -> Int
@@ -116,7 +117,7 @@ mkSession serverPath = do
           then port
           else noDetectError
       where
-        prefix = "listening on port: "
+        prefix = "Capybara-webkit server started, listening on port: "
         digits = takeWhile isDigit . drop (length prefix)
         port = read $ digits str
 
