@@ -2,7 +2,7 @@
 
 module Happybara.WebKit.Commands where
 
-import           Happybara.WebKit.Classes
+import           Happybara.WebKit.Classes (FrameId(..), NodeValue(..), Session(..))
 
 import           Data.Aeson
 import           Data.ByteString            (ByteString)
@@ -29,6 +29,8 @@ import           Network.HTTP.Types
 import           Network.Socket
 
 import           System.Info                (os)
+
+type NodeHandle = Text
 
 enc :: Text -> ByteString
 enc s = encodeUtf8 s
@@ -59,37 +61,44 @@ command sess cmd args = do
           then BS.hGet h len
           else return ""
 
-authenticate :: Session -> Text -> Text -> IO Text
+
+invoke :: Session -> NodeHandle -> ByteString -> [ByteString] -> IO ByteString
+invoke sess h name args =
+    command sess "Node" (name:allow_unattached_nodes:enc h:args)
+  where
+    allow_unattached_nodes = "true"
+
+authenticate :: Session -> Text -> Text -> IO ()
 authenticate sess username password =
-    dec $ command sess "Authenticate" [enc username, enc password]
+    void $ command sess "Authenticate" [enc username, enc password]
 
-enableLogging :: Session -> IO Text
+enableLogging :: Session -> IO ()
 enableLogging sess =
-    dec $ command sess "EnableLogging" []
+    void $ command sess "EnableLogging" []
 
-visit :: Session -> Text -> Text -> IO Text
-visit sess username password =
-    dec $ command sess "Visit" [enc username, enc password]
+visit :: Session -> Text -> IO ()
+visit sess url =
+    void $ command sess "Visit" [enc url]
 
-header :: Session -> Text -> Text -> IO Text
+header :: Session -> Text -> Text -> IO ()
 header sess key value =
-    dec $ command sess "Header" [enc key, enc value]
+    void $ command sess "Header" [enc key, enc value]
 
 getTitle :: Session -> IO Text
 getTitle sess =
     dec $ command sess "Title" []
 
-findXPath :: Session -> Text -> IO [Text]
+findXPath :: Session -> Text -> IO [NodeHandle]
 findXPath sess query =
     T.splitOn "," <$> (dec $ command sess "FindXpath" [enc query])
 
-findCSS :: Session -> Text -> IO [Text]
+findCSS :: Session -> Text -> IO [NodeHandle]
 findCSS sess query =
     T.splitOn "," <$> (dec $ command sess "FindCss" [enc query])
 
-reset :: Session -> IO Text
+reset :: Session -> IO ()
 reset sess =
-    dec $ command sess "Reset" []
+    void $ command sess "Reset" []
 
 body :: Session -> IO Text
 body sess =
@@ -98,7 +107,6 @@ body sess =
 statusCode :: Session -> IO Int
 statusCode sess =
     (return . read . BS.unpack) =<< command sess "Status" []
-
 
 toValue :: ByteString -> Value
 toValue str = case eitherDecode (BS.fromStrict str) of
@@ -146,9 +154,9 @@ setFrameFocus sess frame =
         NoFrame ->
             void $ command sess "FrameFocus" []
 
-ignoreSslErrors :: Session -> IO Text
+ignoreSslErrors :: Session -> IO ()
 ignoreSslErrors sess =
-    dec $ command sess "IgnoreSslErrors" []
+    void $ command sess "IgnoreSslErrors" []
 
 setSkipImageLoading :: Session -> Bool -> IO ()
 setSkipImageLoading sess flag =
@@ -225,3 +233,152 @@ resizeWindow sess width height =
 getVersion :: Session -> IO ()
 getVersion sess =
     void $ command sess "Version" []
+
+
+-- NODE FUNCTIONS
+
+allText :: Session -> NodeHandle -> IO Text
+allText sess h = dec $ invoke sess h "allText" []
+
+visibleText :: Session -> NodeHandle -> IO Text
+visibleText sess h = dec $ invoke sess h "text" []
+
+findXPathRel :: Session -> NodeHandle -> Text -> IO [NodeHandle]
+findXPathRel sess h query =
+    T.splitOn "," <$> (dec $ invoke sess h "findXpathWithin" [enc query])
+
+findCSSRel :: Session -> NodeHandle -> Text -> IO [NodeHandle]
+findCSSRel sess h query =
+    T.splitOn "," <$> (dec $ invoke sess h "findCssWithin" [enc query])
+
+attr :: Session -> NodeHandle -> Text -> IO (Maybe Text)
+attr sess h name = do
+    has <- hasAttr sess h name
+    if has
+      then do
+          val <- (dec $ invoke sess h "attribute" [enc name])
+          return $ Just val
+      else do
+          return Nothing
+
+hasAttr :: Session -> NodeHandle -> Text -> IO Bool
+hasAttr sess h name = do
+    val <- invoke sess h "hasAttribute" [enc name]
+    return $ val == "true"
+
+value :: Session -> NodeHandle -> IO NodeValue
+value sess h = do
+    isMult <- isMultipleSelect sess h
+    if isMult
+      then do
+          handles <- findXPathRel sess h ".//option"
+          selected <- filterM (isSelected sess) handles
+          values <- mapM (invoke sess h "value" . (:[]) . enc) selected
+          return $ MultiValue selected
+      else do
+        val <- dec $ invoke sess h "value" []
+        return $ SingleValue val
+
+set :: Session -> NodeHandle -> NodeValue -> IO ()
+set sess h val =
+    case val of
+        SingleValue v -> 
+            void $ invoke sess h "set" [enc v]
+        MultiValue vs -> 
+            void $ invoke sess h "set" (map enc vs)
+
+isMultipleSelect :: Session -> NodeHandle -> IO Bool
+isMultipleSelect sess h = do
+    name <- tagName sess h
+    mult <- attr sess h "multiple"
+    return $ mult == Just "true"
+
+tagName :: Session -> NodeHandle -> IO Text
+tagName sess h = dec $ invoke sess h "tagName" []
+
+isSelected :: Session -> NodeHandle -> IO Bool
+isSelected sess h = do
+    val <- invoke sess h "selected" []
+    return $ val == "true"
+
+isVisible :: Session -> NodeHandle -> IO Bool
+isVisible sess h = do
+    val <- invoke sess h "visible" []
+    return $ val == "true"
+
+isChecked :: Session -> NodeHandle -> IO Bool
+isChecked sess h = do
+    mult <- attr sess h "checked"
+    return $ mult == Just "true"
+
+isDisabled :: Session -> NodeHandle -> IO Bool
+isDisabled sess h = do
+    name <- tagName sess h
+    if (name == "option" || name == "optgroup")
+      then do
+          dis <- attr sess h "disabled"
+          if (dis == Just "true")
+            then return True
+            else do
+                parent <- findXPathRel sess h "parent::*"
+                isDisabled sess (head parent)
+      else do
+          dis <- attr sess h "disabled"
+          return $ dis == Just "true"
+
+selectOption :: Session -> NodeHandle -> IO ()
+selectOption sess h =
+    void $ invoke sess h "selectOption" []
+
+unselectOption :: Session -> NodeHandle -> IO ()
+unselectOption sess h = do
+    selects <- findXPathRel sess h "ancestor::select"
+    if (not . null $ selects)
+      then do
+          isMult <- isMultipleSelect sess (head selects)
+          if isMult
+            then void $ invoke sess h "unselectOption" []
+            else error "UnselectNotAllowed"
+      else error "UnselectNotAllowed"
+
+click :: Session -> NodeHandle -> IO ()
+click sess h =
+    void $ invoke sess h "leftClick" []
+
+doubleClick :: Session -> NodeHandle -> IO ()
+doubleClick sess h =
+    void $ invoke sess h "doubleClick" []
+
+rightClick :: Session -> NodeHandle -> IO ()
+rightClick sess h =
+    void $ invoke sess h "rightClick" []
+
+hover :: Session -> NodeHandle -> IO ()
+hover sess h =
+    void $ invoke sess h "hover" []
+
+dragTo :: Session -> NodeHandle -> NodeHandle -> IO ()
+dragTo sess h1 h2 =
+    void $ invoke sess h1 "hover" [enc h2]
+
+path :: Session -> NodeHandle -> IO Text
+path sess h =
+    dec $ invoke sess h "path" []
+
+submit :: Session -> NodeHandle -> IO ()
+submit sess h =
+    void $ invoke sess h "submit" []
+
+trigger :: Session -> NodeHandle -> Text -> IO ()
+trigger sess h event =
+    void $ invoke sess h "trigger" [enc event]
+
+isAttached :: Session -> NodeHandle -> IO Bool
+isAttached sess h = do
+    val <- command sess "Node" ["isAttached", enc h]
+    return $ val == "true"
+
+nodeEq :: Session -> NodeHandle -> NodeHandle -> IO Bool
+nodeEq sess h1 h2 = do
+    val <- invoke sess h1 "equals" [enc h2]
+    return $ val == "true"

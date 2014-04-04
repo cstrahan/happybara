@@ -42,8 +42,13 @@ data FrameId = FrameIndex Int
              | FrameName Text
              | NoFrame
 
+data Query = ByCSS Text
+           | ByXPath Text
+
 class MonadBaseControl IO m => Driver m where
     data Node m :: *
+    {- currentNode     :: m (Node m) -}
+    {- setCurrentNode  :: Node m -> m () -}
     currentUrl      :: m Text
     visit           :: Text -> m ()
     findXPath       :: Text -> m [Node m]
@@ -59,11 +64,13 @@ class MonadBaseControl IO m => Driver m where
     withinFrame     :: FrameId -> m a -> m a
     withinWindow    :: Text -> m a -> m a
     reset           :: m ()
+    findXPathRel    :: Node m -> Text -> m [Node m]
+    findCSSRel      :: Node m -> Text -> m [Node m]
     allText         :: Node m -> m Text
     visibleText     :: Node m -> m Text
-    attr            :: Node m -> Text -> m Text
-    value           :: Node m -> m NodeValue
-    set             :: Node m -> NodeValue -> m ()
+    attr            :: Node m -> Text -> m (Maybe Text)
+    getValue        :: Node m -> m NodeValue
+    setValue        :: Node m -> NodeValue -> m ()
     selectOption    :: Node m -> m ()
     unselectOption  :: Node m -> m ()
     click           :: Node m -> m ()
