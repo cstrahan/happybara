@@ -38,6 +38,11 @@ enc s = encodeUtf8 s
 dec :: IO ByteString -> IO Text
 dec s = s >>= (return . decodeUtf8)
 
+toValue :: ByteString -> Value
+toValue str = case eitherDecode (BS.fromStrict str) of
+                  Left msg  -> error msg
+                  Right val -> val
+
 command :: Session -> ByteString -> [ByteString] -> IO ByteString
 command sess cmd args = do
     BS.hPutStrLn h cmd
@@ -49,7 +54,7 @@ command sess cmd args = do
     check
     readResponse
   where
-    h = handle sess
+    h = sockHandle sess
     check = do
         result <- BS.hGetLine h
         when (result /= "ok") $ do
@@ -106,11 +111,6 @@ body sess =
 statusCode :: Session -> IO Int
 statusCode sess =
     (return . read . BS.unpack) =<< command sess "Status" []
-
-toValue :: ByteString -> Value
-toValue str = case eitherDecode (BS.fromStrict str) of
-                  Left msg  -> error msg
-                  Right val -> val
 
 consoleMessages :: Session -> IO Value
 consoleMessages sess =

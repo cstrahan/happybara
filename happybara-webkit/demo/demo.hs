@@ -10,8 +10,9 @@ import Data.Text as T
 
 main :: IO ()
 main = do
-    runBrowser $ do
-        visit "http://google.com"
-        h <- currentUrl
+    serverPath <- defaultServerPath
+    withSession serverPath $ \sess -> do
+        visit sess "http://google.com"
+        h <- currentUrl sess
         liftIO $ putStr $ T.unpack h
         return ()

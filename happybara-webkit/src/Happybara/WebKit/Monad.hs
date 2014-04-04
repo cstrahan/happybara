@@ -77,126 +77,88 @@ instance MonadBaseControl IO Browser where
 
     restoreM = Browser . restoreM . unStBrowser
 
-getSession :: Browser Session
-getSession = Browser $ get
-
 runBrowser :: Browser a -> IO a
 runBrowser (Browser m) = do
     serverPath <- defaultServerPath
     sess <- mkSession serverPath
     evalStateT m sess
 
-instance Driver Browser where
-    data Node Browser = BrowserNode !Text
-    currentUrl = do
-        sess <- getSession
-        liftIO $ CMD.currentUrl sess
-    visit url = do
-        sess <- getSession
-        liftIO $ CMD.visit sess url
-    findXPath query = do
-        sess <- getSession
-        handles <- liftIO $ CMD.findXPath sess query
-        return $ map BrowserNode handles
-    findCSS query = do
-        sess <- getSession
-        handles <- liftIO $ CMD.findCSS sess query
-        return $ map BrowserNode handles
-    html = do
-        sess <- getSession
-        liftIO $ CMD.body sess
+instance Driver Session where
+    data Node Session = WebKitNode !Text
+    currentUrl sess = do
+        CMD.currentUrl sess
+    visit sess url = CMD.visit sess url
+    findXPath sess query = do
+        handles <- CMD.findXPath sess query
+        return $ map WebKitNode handles
+    findCSS sess query = do
+        handles <- CMD.findCSS sess query
+        return $ map WebKitNode handles
+    html sess = do
+        CMD.body sess
     goBack = error "NOT IMPLEMENTED"
     goForward = error "NOT IMPLEMENTED"
-    executeScript script = do
-        sess <- getSession
-        liftIO $ CMD.executeScript sess script
-    evaluateScript script = do
-        sess <- getSession
-        liftIO $ CMD.evaluateScript sess script
-    saveScreenshot path width height = do
-        sess <- getSession
-        liftIO $ CMD.render sess path width height
-    responseHeaders = do
-        sess <- getSession
-        liftIO $ CMD.responseHeaders sess
-    statusCode = do
-        sess <- getSession
-        liftIO $ toEnum <$> CMD.statusCode sess
-    withinFrame frameId m = do
-        sess <- getSession
-        liftIO $ CMD.setFrameFocus sess frameId
-        res <- m
-        liftIO $ CMD.setFrameFocus sess NoFrame
-        return res
-    withinWindow name m = error "NOT IMPLEMENTED"
-    reset = do
-        sess <- getSession
-        liftIO $ CMD.reset sess
-    findXPathRel (BrowserNode h) query = do
-        sess <- getSession
-        handles <- liftIO $ CMD.findXPathRel sess h query
-        return $ map BrowserNode handles
-    findCSSRel (BrowserNode h) query = do
-        sess <- getSession
-        handles <- liftIO $ CMD.findCSSRel sess h query
-        return $ map BrowserNode handles
-    allText (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.allText sess h
-    visibleText (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.visibleText sess h
-    attr (BrowserNode h) name = do
-        sess <- getSession
-        liftIO $ CMD.attr sess h name
-    getValue (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.value sess h
-    setValue (BrowserNode h) val = do
-        sess <- getSession
-        liftIO $ CMD.set sess h val
-    selectOption (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.selectOption sess h
-    unselectOption (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.unselectOption sess h
-    click (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.click sess h
-    rightClick (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.rightClick sess h
-    doubleClick (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.doubleClick sess h
-    hover (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.hover sess h
-    dragTo (BrowserNode h1) (BrowserNode h2) = do
-        sess <- getSession
-        liftIO $ CMD.dragTo sess h1 h2
-    tagName (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.tagName sess h
-    isVisible (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.isVisible sess h
-    isChecked (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.isChecked sess h
-    isSelected (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.isSelected sess h
-    isDisabled (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.isDisabled sess h
-    path (BrowserNode h) = do
-        sess <- getSession
-        liftIO $ CMD.path sess h
-    trigger (BrowserNode h) event = do
-        sess <- getSession
-        liftIO $ CMD.trigger sess h event
-    nodeEq (BrowserNode h1) (BrowserNode h2) = do
-        sess <- getSession
-        liftIO $ CMD.nodeEq sess h1 h2
+    executeScript sess script = do
+        CMD.executeScript sess script
+    evaluateScript sess script = do
+        CMD.evaluateScript sess script
+    saveScreenshot sess path width height = do
+        CMD.render sess path width height
+    responseHeaders sess = do
+        CMD.responseHeaders sess
+    statusCode sess = do
+        toEnum <$> CMD.statusCode sess
+    withinFrame sess frameId act = do
+        bracket_
+            (CMD.setFrameFocus sess frameId)
+            (CMD.setFrameFocus sess NoFrame)
+            (act)
+    withinWindow sess name m = error "NOT IMPLEMENTED"
+    reset sess = do
+        CMD.reset sess
+    findXPathRel sess (WebKitNode h) query = do
+        handles <- CMD.findXPathRel sess h query
+        return $ map WebKitNode handles
+    findCSSRel sess (WebKitNode h) query = do
+        handles <- CMD.findCSSRel sess h query
+        return $ map WebKitNode handles
+    allText sess (WebKitNode h) = do
+        CMD.allText sess h
+    visibleText sess (WebKitNode h) = do
+        CMD.visibleText sess h
+    attr sess (WebKitNode h) name = do
+        CMD.attr sess h name
+    getValue sess (WebKitNode h) = do
+        CMD.value sess h
+    setValue sess (WebKitNode h) val = do
+        CMD.set sess h val
+    selectOption sess (WebKitNode h) = do
+        CMD.selectOption sess h
+    unselectOption sess (WebKitNode h) = do
+        CMD.unselectOption sess h
+    click sess (WebKitNode h) = do
+        CMD.click sess h
+    rightClick sess (WebKitNode h) = do
+        CMD.rightClick sess h
+    doubleClick sess (WebKitNode h) = do
+        CMD.doubleClick sess h
+    hover sess (WebKitNode h) = do
+        CMD.hover sess h
+    dragTo sess (WebKitNode h1) (WebKitNode h2) = do
+        CMD.dragTo sess h1 h2
+    tagName sess (WebKitNode h) = do
+        CMD.tagName sess h
+    isVisible sess (WebKitNode h) = do
+        CMD.isVisible sess h
+    isChecked sess (WebKitNode h) = do
+        CMD.isChecked sess h
+    isSelected sess (WebKitNode h) = do
+        CMD.isSelected sess h
+    isDisabled sess (WebKitNode h) = do
+        CMD.isDisabled sess h
+    path sess (WebKitNode h) = do
+        CMD.path sess h
+    trigger sess (WebKitNode h) event = do
+        CMD.trigger sess h event
+    nodeEq sess (WebKitNode h1) (WebKitNode h2) = do
+        CMD.nodeEq sess h1 h2
