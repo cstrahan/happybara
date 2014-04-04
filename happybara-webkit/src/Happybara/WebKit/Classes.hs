@@ -1,18 +1,19 @@
-{-# LANGUAGE OverloadedStrings#-}
+{-# LANGUAGE FlexibleContexts, TypeFamilies, GeneralizedNewtypeDeriving,
+             MultiParamTypeClasses, BangPatterns, OverloadedStrings #-}
 
-module Happybara.WebKit.Classes
-       (
-       ) where
+module Happybara.WebKit.Classes where
 
-
-{- import qualified Data.ByteString as BS -}
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Word8 as BS
 import Data.Char (isDigit)
+import qualified Data.Text as T
+import Data.Text (Text)
 import Data.Maybe (maybe)
 import Data.List (isPrefixOf)
 import Data.ByteString (ByteString)
+import Data.Aeson
 
+import Control.Monad.Trans.Control
 import Control.Applicative
 import Control.Monad
 
@@ -22,6 +23,7 @@ import System.Process
 
 import Network.Socket
 import Network.BSD
+import Network.HTTP.Types (Header, ResponseHeaders, Status)
 
 import System.Info (os)
 
@@ -32,6 +34,51 @@ data Session = Session { sock       :: Socket
                        , procHandle :: ProcessHandle
                        }
 
+data NodeValue = SingleValue Text
+               | MultiValue [Text]
+
+-- TODO: Support Nodes. Maybe use data family?
+data FrameId = FrameIndex Int
+             | FrameName Text
+             | NoFrame
+
+class MonadBaseControl IO m => Driver m where
+    data Node m :: *
+    currentUrl      :: m Text
+    visit           :: Text -> m ()
+    findXPath       :: Text -> m [Node m]
+    findCSS         :: Text -> m [Node m]
+    html            :: m Text
+    goBack          :: m ()
+    goForward       :: m ()
+    executeScript   :: Text -> m ()
+    evaluateScript  :: Text -> m Value
+    saveScreenshot  :: Text -> Int -> Int -> m ()
+    responseHeaders :: m ResponseHeaders
+    statusCode      :: m Status
+    withinFrame     :: FrameId -> m a -> m a
+    withinWindow    :: Text -> m a -> m a
+    reset           :: m ()
+    allText         :: Node m -> m Text
+    visibleText     :: Node m -> m Text
+    attr            :: Node m -> Text -> m Text
+    value           :: Node m -> m NodeValue
+    set             :: Node m -> NodeValue -> m ()
+    selectOption    :: Node m -> m ()
+    unselectOption  :: Node m -> m ()
+    click           :: Node m -> m ()
+    rightClick      :: Node m -> m ()
+    doubleClick     :: Node m -> m ()
+    hover           :: Node m -> m ()
+    dragTo          :: Node m -> Node m -> m ()
+    tagName         :: Node m -> m Text
+    isVisible       :: Node m -> m Bool
+    isChecked       :: Node m -> m Bool
+    isSelected      :: Node m -> m Bool
+    isDisabled      :: Node m -> m Bool
+    path            :: Node m -> m Text
+    trigger         :: Node m -> Text -> m ()
+    nodeEq          :: Node m -> Node m -> m Bool
 
 webkitServerStartTimeout = 15 * 1000000
 
@@ -65,27 +112,5 @@ mkSession serverPath = do
         prefix = "listening on port: "
         digits = takeWhile isDigit . drop (length prefix)
         port = read $ digits str
-
-command :: Session -> ByteString -> [ByteString] -> IO ByteString
-command sess cmd args = do
-    BS.hPutStrLn h cmd
-    BS.hPutStrLn h (BS.pack . show . length $ args)
-    forM_ args $ \arg -> do
-        BS.putStrLn (BS.pack . show . BS.length $ arg)
-        BS.putStr arg
-    check
-    readResponse
-  where
-    h = handle sess
-    check = do
-        result <- BS.hGetLine h
-        when (result /= "ok") $ do
-            response <- readResponse
-            fail $ BS.unpack response
-    readResponse = do
-        len <- (read . BS.unpack) <$> BS.hGetLine h
-        if len > 0
-          then BS.hGet h len
-          else return ""
 
 noDetectError = error "could not detect webkit_server port"

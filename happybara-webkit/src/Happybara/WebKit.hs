@@ -1,3 +1,4 @@
-module HappyBara.WebKit where
+module Happybara.WebKit where
 
-import Paths_happybara_webkit (getDataFileName)
+import Happybara.WebKit.Classes
+import Happybara.WebKit.Monad

@@ -18,13 +18,24 @@ cabal-version:       >=1.10
 data-dir:            data/
 
 library
-  exposed-modules:     HappyBara.WebKit
+  exposed-modules:     Happybara.WebKit
   other-modules:       Paths_happybara_webkit
   build-depends:       base >=4.6 && <4.7,
                        process,
                        directory,
                        network,
                        word8,
-                       bytestring
+                       bytestring,
+                       mtl,
+                       monad-control,
+                       lifted-base,
+                       data-default,
+                       MonadCatchIO-transformers,
+                       transformers-base,
+                       text,
+                       http-types,
+                       vector,
+                       aeson,
+                       case-insensitive
   hs-source-dirs:      src
   default-language:    Haskell2010
