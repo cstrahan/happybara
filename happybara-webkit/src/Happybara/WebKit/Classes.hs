@@ -36,7 +36,7 @@ import           System.Info                 (os)
 import           Paths_happybara_webkit      (getDataFileName, getLibexecDir)
 
 data Session = Session { sock       :: Net.Socket
-                       , sockHandle     :: Handle
+                       , sockHandle :: Handle
                        , procHandle :: ProcessHandle
                        }
 
