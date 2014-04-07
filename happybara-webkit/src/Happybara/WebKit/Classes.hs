@@ -6,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE RankNTypes               #-}
 
 module Happybara.WebKit.Classes where
 
@@ -13,7 +14,7 @@ import           Data.Aeson
 import           Data.ByteString             (ByteString)
 import qualified Data.ByteString.Char8       as BS
 import           Data.Char                   (isDigit)
-import           Data.List                   (isPrefixOf)
+import           Data.List                   (isPrefixOf, sort)
 import           Data.Maybe                  (maybe)
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
@@ -87,6 +88,7 @@ data Session = Session { sock       :: Net.Socket
 
 data NodeValue = SingleValue Text
                | MultiValue [Text]
+               deriving (Eq, Ord)
 
 -- TODO: Support Nodes. Maybe use data family?
 data FrameSelector = FrameIndex Int
@@ -149,7 +151,7 @@ data SimpleQuery sess where
                   => Exactness
                   -> (Bool -> Text)
                   -> (Maybe (Node sess))
-                  -> [(Node sess) -> IO Bool]
+                  -> [sess -> (Node sess) -> IO Bool]
                   -> Text
                   -> SimpleQuery sess
 
@@ -179,68 +181,114 @@ instance Query (SimpleQuery sess) where
       where
         allM _ []     = return True
         allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
-        pred x = allM ($x) preds
+        pred x = allM (\p -> p sess x) preds
         find x = do
             res <- case mrel of
                        Just node -> findXPathRel sess node x
                        _         -> findXPath sess x
             filterM pred res
 
-link :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+-- basic queries
+
+link :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 link locator preds =
     MkSimpleQuery PreferExact (X.link locator) Nothing preds "link"
 
-button :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+button :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 button locator preds =
     MkSimpleQuery PreferExact (X.button locator) Nothing preds "button"
 
-linkOrButton :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+linkOrButton :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 linkOrButton locator preds =
     MkSimpleQuery PreferExact (X.linkOrButton locator) Nothing preds "linkOrButton"
 
-fieldset :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+fieldset :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 fieldset locator preds =
     MkSimpleQuery PreferExact (X.fieldset locator) Nothing preds "fieldset"
 
-field :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+field :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 field locator preds =
     MkSimpleQuery PreferExact (X.field locator) Nothing preds "field"
 
-fillableField :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+fillableField :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 fillableField locator preds =
     MkSimpleQuery PreferExact (X.fillableField locator) Nothing preds "fillableField"
 
-select :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+select :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 select locator preds =
     MkSimpleQuery PreferExact (X.select locator) Nothing preds "select"
 
-checkbox :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+checkbox :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 checkbox locator preds =
     MkSimpleQuery PreferExact (X.checkbox locator) Nothing preds "checkbox"
 
-radioButton :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+radioButton :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 radioButton locator preds =
     MkSimpleQuery PreferExact (X.radioButton locator) Nothing preds "radioButton"
 
-fileField :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+fileField :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 fileField locator preds =
     MkSimpleQuery PreferExact (X.fileField locator) Nothing preds "fileField"
 
-optgroup :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+optgroup :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 optgroup locator preds =
     MkSimpleQuery PreferExact (X.optgroup locator) Nothing preds "optgroup"
 
-option :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+option :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 option locator preds =
     MkSimpleQuery PreferExact (X.option locator) Nothing preds "option"
 
-table :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+table :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 table locator preds =
     MkSimpleQuery PreferExact (X.table locator) Nothing preds "table"
 
-definitionDescription :: (Driver sess) => Text -> [Node sess -> IO Bool] -> SimpleQuery sess
+definitionDescription :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
 definitionDescription locator preds =
     MkSimpleQuery PreferExact (const $ X.definitionDescription locator) Nothing preds "definitionDescription"
+
+-- predicates
+
+href :: (Driver sess) => Text -> sess -> Node sess -> IO Bool
+href url sess node =
+    (not . null) <$> findXPathRel sess node xpath
+  where
+    xpath = T.concat ["./self::*[./@href = ", X.stringLiteral url, "]"]
+
+checked :: (Driver sess) => Bool -> sess -> Node sess -> IO Bool
+checked b sess node =
+    (b==) <$> isChecked sess node
+
+unchecked :: (Driver sess) => Bool -> sess -> Node sess -> IO Bool
+unchecked b sess node =
+    (b/=) <$> isChecked sess node
+
+disabled :: (Driver sess) => Bool -> sess -> Node sess -> IO Bool
+disabled b sess node = do
+    name <- tagName sess node
+    if name == "a"
+      then return True
+      else (b==) <$> isDisabled sess node
+
+selected :: (Driver sess) => NodeValue -> sess -> Node sess -> IO Bool
+selected (SingleValue val) sess node =
+    ((SingleValue val) ==) <$> getValue sess node
+selected (MultiValue vals) sess node = do
+    opts <- findXPathRel sess node ".//option"
+    seld <- filterM (isSelected sess) opts
+    texts <- mapM (visibleText sess) seld
+    return $ sort vals == sort texts
+
+options :: (Driver sess) => [Text] -> sess -> Node sess -> IO Bool
+options opts sess node = do
+    options <- findXPathRel sess node ".//option"
+    actual <- mapM (visibleText sess) options
+    return $ (sort opts) == (sort actual)
+
+elemType :: (Driver sess) => Text -> sess -> Node sess -> IO Bool
+elemType t sess node =
+    if any (t==) ["textarea", "select"]
+      then (t==) <$> tagName sess node
+      else (Just t==) <$> attr sess node "type"
 
 class Driver sess where
     data Node sess :: *
