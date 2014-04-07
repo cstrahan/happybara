@@ -2,8 +2,6 @@
 
 module Happybara.WebKit.Commands where
 
-import           Happybara.WebKit.Classes (FrameSelector(..), NodeValue(..), Session(..))
-
 import           Data.Aeson
 import           Data.ByteString            (ByteString)
 import qualified Data.ByteString.Char8      as BS
@@ -11,13 +9,14 @@ import qualified Data.ByteString.Lazy.Char8 as BS (fromStrict, toStrict)
 import qualified Data.CaseInsensitive       as CI
 import           Data.Char                  (isDigit)
 import           Data.List                  (isPrefixOf)
-import           Data.Maybe                 (maybe)
+import           Data.Maybe                 (maybe, fromJust)
 import           Data.Text                  (Text)
 import qualified Data.Text                  as T
 import           Data.Text.Encoding
 import qualified Data.Vector                as V
 
 import           Control.Applicative
+import           Control.Exception
 import           Control.Monad
 
 import           System.IO
@@ -30,7 +29,22 @@ import           Network.Socket
 
 import           System.Info                (os)
 
+import           Happybara.Classes (FrameSelector(..), NodeValue(..))
+import           Happybara.Exceptions
+import           Happybara.WebKit.Exceptions
+import           Happybara.WebKit.Session (Session(..))
+
 type NodeHandle = Text
+
+data JsonError = JsonError { jsonErrorClass :: String
+                           , jsonErrorMessage :: String
+                           }
+
+instance FromJSON JsonError where
+    parseJSON (Object v) = JsonError <$>
+                           v .: "class" <*>
+                           v .: "message"
+    parseJSON _          = mzero
 
 enc :: Text -> ByteString
 enc s = encodeUtf8 s
@@ -42,6 +56,20 @@ toValue :: ByteString -> Value
 toValue str = case eitherDecode (BS.fromStrict str) of
                   Left msg  -> error msg
                   Right val -> val
+
+jsonErrorToException :: JsonError -> SomeException
+jsonErrorToException (JsonError "NodeNotAttachedError" msg) =
+    toException $ NodeNotAttachedException msg
+jsonErrorToException (JsonError "InvalidResponseError" msg) =
+    toException $ InvalidResponseException msg
+jsonErrorToException (JsonError "NoResponseError" msg) =
+    toException $ NoResponseException msg
+jsonErrorToException (JsonError "ClickFailed" msg) =
+    toException $ ClickFailedException msg
+jsonErrorToException (JsonError "TimeoutError" msg) =
+    toException $ TimeoutException msg
+jsonErrorToException (JsonError klass msg) =
+    error $ concat [ "Unkown exception type: ", klass ]
 
 command :: Session -> ByteString -> [ByteString] -> IO ByteString
 command sess cmd args = do
@@ -59,7 +87,7 @@ command sess cmd args = do
         result <- BS.hGetLine h
         when (result /= "ok") $ do
             response <- readResponse
-            fail $ BS.unpack response
+            (throw . jsonErrorToException . fromJust . decode) $ BS.fromStrict response
     readResponse = do
         len <- (read . BS.unpack) <$> BS.hGetLine h
         if len > 0

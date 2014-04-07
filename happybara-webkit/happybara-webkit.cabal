@@ -18,11 +18,15 @@ cabal-version:       >=1.10
 data-dir:            data/
 
 library
-  exposed-modules:     Happybara.WebKit,
-                       Happybara.WebKit.Classes,
-                       Happybara.WebKit.Monad,
+  exposed-modules:     Happybara.Classes,
+                       Happybara.Exceptions,
+                       Happybara.Query,
+                       Happybara.WebKit,
                        Happybara.WebKit.Commands,
-                       Happybara.WebKit.XPath
+                       Happybara.WebKit.Driver,
+                       Happybara.WebKit.Exceptions,
+                       Happybara.WebKit.Session,
+                       Happybara.XPath
   other-modules:       Paths_happybara_webkit
   build-depends:       base >=4.6 && <4.7,
                        process,

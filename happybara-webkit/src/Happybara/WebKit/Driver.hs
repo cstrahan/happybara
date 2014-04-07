@@ -6,12 +6,11 @@
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeFamilies               #-}
 
-module Happybara.WebKit.Monad where
+module Happybara.WebKit.Driver where
 
 import           Data.Aeson
 import           Data.ByteString             (ByteString)
 import           Data.Text                   (Text)
-import           Data.Typeable
 
 import           Network.HTTP.Types
 
@@ -21,7 +20,8 @@ import           Control.Monad.Base
 import           Control.Monad.State
 import           Control.Monad.Trans.Control
 
-import           Happybara.WebKit.Classes
+import           Happybara.Classes
+import           Happybara.WebKit.Session
 import           Happybara.WebKit.Commands   as CMD
 
 instance Driver Session where

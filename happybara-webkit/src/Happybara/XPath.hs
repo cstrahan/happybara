@@ -3,7 +3,7 @@
 -- This module is generated from the Ruby 'xpath' gem.
 -- See: https://gist.github.com/cstrahan/10015991
 
-module Happybara.WebKit.XPath where
+module Happybara.XPath where
 import           Data.Text as T
 
 stringLiteral :: Text -> Text
@@ -11,7 +11,7 @@ stringLiteral str =
     go $ splitOn "'" str
   where
     go (x:[]) = T.concat ["'", x, "'"]
-    go (xs)   = T.concat ["concat(", T.intercalate "',\"'\",'" xs, ")"]
+    go (xs)   = T.concat ["concat('", T.intercalate "',\"'\",'" xs, "')"]
 
 link :: Text -> Bool -> Text
 link locator exact =
