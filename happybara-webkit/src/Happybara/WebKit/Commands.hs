@@ -2,7 +2,7 @@
 
 module Happybara.WebKit.Commands where
 
-import           Happybara.WebKit.Classes (FrameId(..), NodeValue(..), Session(..))
+import           Happybara.WebKit.Classes (FrameSelector(..), NodeValue(..), Session(..))
 
 import           Data.Aeson
 import           Data.ByteString            (ByteString)
@@ -143,14 +143,14 @@ currentUrl :: Session -> IO Text
 currentUrl sess =
     dec $ command sess "CurrentUrl" []
 
-setFrameFocus :: Session -> FrameId -> IO ()
+setFrameFocus :: Session -> FrameSelector -> IO ()
 setFrameFocus sess frame =
     case frame of
         FrameIndex idx ->
             void $ command sess "FrameFocus" [enc "", BS.pack . show $ idx]
         FrameName name ->
             void $ command sess "FrameFocus" [enc name]
-        NoFrame ->
+        DefaultFrame ->
             void $ command sess "FrameFocus" []
 
 ignoreSslErrors :: Session -> IO ()
@@ -229,9 +229,9 @@ resizeWindow sess width height =
   where
     show' = (BS.pack . show)
 
-getVersion :: Session -> IO ()
+getVersion :: Session -> IO Text
 getVersion sess =
-    void $ command sess "Version" []
+    dec $ command sess "Version" []
 
 
 -- NODE FUNCTIONS
@@ -358,7 +358,7 @@ hover sess h =
 
 dragTo :: Session -> NodeHandle -> NodeHandle -> IO ()
 dragTo sess h1 h2 =
-    void $ invoke sess h1 "hover" [enc h2]
+    void $ invoke sess h1 "dragTo" [enc h2]
 
 path :: Session -> NodeHandle -> IO Text
 path sess h =

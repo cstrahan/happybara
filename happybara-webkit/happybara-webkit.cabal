@@ -21,7 +21,8 @@ library
   exposed-modules:     Happybara.WebKit,
                        Happybara.WebKit.Classes,
                        Happybara.WebKit.Monad,
-                       Happybara.WebKit.Commands
+                       Happybara.WebKit.Commands,
+                       Happybara.WebKit.XPath
   other-modules:       Paths_happybara_webkit
   build-depends:       base >=4.6 && <4.7,
                        process,

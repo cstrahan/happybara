@@ -14,5 +14,5 @@ main = do
     withSession serverPath $ \sess -> do
         visit sess "http://google.com"
         h <- currentUrl sess
-        liftIO $ putStr $ T.unpack h
+        print $ T.unpack h
         return ()
