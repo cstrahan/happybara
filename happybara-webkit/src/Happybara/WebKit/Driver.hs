@@ -25,7 +25,7 @@ import           Happybara.WebKit.Session
 import           Happybara.WebKit.Commands   as CMD
 
 instance Driver Session where
-    data Node Session = WebKitNode !Text
+    data Node Session = WebKitNode !Text deriving (Show)
     waitNested = error "NOT IMPLEMENTED"
     currentUrl sess = do
         CMD.currentUrl sess

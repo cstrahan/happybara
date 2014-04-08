@@ -45,15 +45,17 @@ import           Paths_happybara_webkit      (getDataFileName, getLibexecDir)
 
 data NodeValue = SingleValue Text
                | MultiValue [Text]
-               deriving (Eq, Ord)
+               deriving (Eq, Show)
 
 data FrameSelector = FrameIndex Int
                    | FrameName Text
                    | DefaultFrame
+                   deriving (Eq, Show)
 
 data Exactness = Exact
                | PreferExact
                | Inexact
+               deriving (Eq, Ord, Show)
 
 class Query q where
     type QueryDriver q :: *

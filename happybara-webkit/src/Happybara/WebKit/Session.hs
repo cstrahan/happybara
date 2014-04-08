@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Happybara.WebKit.Session where
 
 import           Data.Char                   (isDigit)
@@ -26,8 +28,10 @@ data Session = Session { sock       :: Net.Socket
                        , procHandle :: ProcessHandle
                        }
 
+webkitServerStartTimeout :: Int
 webkitServerStartTimeout = 15 * 1000000
 
+defaultServerPath :: IO FilePath
 defaultServerPath = getDataFileName $ if os == "mingw32"
                                         then "webkit_server.exe"
                                         else "webkit_server"
@@ -41,7 +45,7 @@ withSession serverPath fun = do
 
 mkSession :: FilePath -> IO Session
 mkSession serverPath = do
-    (_, sout, serr, p) <- runInteractiveProcess serverPath [] Nothing Nothing
+    (_, sout, _, p) <- runInteractiveProcess serverPath [] Nothing Nothing
     mport <- timeout webkitServerStartTimeout (parsePort <$> hGetLine sout)
     let port = maybe noDetectError id mport
     addr <- head <$> Net.getAddrInfo Nothing (Just "localhost") (Just $ show port)
@@ -70,4 +74,5 @@ closeSession sess = do
     hClose (sockHandle sess)
     terminateProcess (procHandle sess)
 
+noDetectError :: forall t. t
 noDetectError = error "could not detect webkit_server port"
