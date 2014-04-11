@@ -49,7 +49,7 @@ instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
         (Just <$> findOrFail q) `catch` (\(e :: InvalidElementException) ->
             return $ Nothing)
 
-    findOrFail q@(MkSimpleQuery xpath preds _) = do
+    findOrFail q = do
         M.synchronize $ do
             matchStrategy <- M.getSingleMatchStrategy
             results <- findAll q
