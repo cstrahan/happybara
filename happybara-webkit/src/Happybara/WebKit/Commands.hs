@@ -3,17 +3,17 @@
 module Happybara.WebKit.Commands where
 
 import           Data.Aeson
-import           Data.ByteString            (ByteString)
-import qualified Data.ByteString.Char8      as BS
-import qualified Data.ByteString.Lazy.Char8 as BS (fromStrict, toStrict)
-import qualified Data.CaseInsensitive       as CI
-import           Data.Char                  (isDigit)
-import           Data.List                  (isPrefixOf)
-import           Data.Maybe                 (maybe, fromJust)
-import           Data.Text                  (Text)
-import qualified Data.Text                  as T
+import           Data.ByteString             (ByteString)
+import qualified Data.ByteString.Char8       as BS
+import qualified Data.ByteString.Lazy.Char8  as BS (fromStrict, toStrict)
+import qualified Data.CaseInsensitive        as CI
+import           Data.Char                   (isDigit)
+import           Data.List                   (isPrefixOf)
+import           Data.Maybe                  (fromJust, maybe)
+import           Data.Text                   (Text)
+import qualified Data.Text                   as T
 import           Data.Text.Encoding
-import qualified Data.Vector                as V
+import qualified Data.Vector                 as V
 
 import           Control.Applicative
 import           Control.Exception
@@ -27,16 +27,17 @@ import           Network.BSD
 import           Network.HTTP.Types
 import           Network.Socket
 
-import           System.Info                (os)
+import           System.Info                 (os)
 
-import           Happybara.Classes (FrameSelector(..), NodeValue(..))
+import           Happybara.Driver            (FrameSelector (..),
+                                              NodeValue (..))
 import           Happybara.Exceptions
 import           Happybara.WebKit.Exceptions
-import           Happybara.WebKit.Session (Session(..))
+import           Happybara.WebKit.Session    (Session (..))
 
 type NodeHandle = Text
 
-data JsonError = JsonError { jsonErrorClass :: String
+data JsonError = JsonError { jsonErrorClass   :: String
                            , jsonErrorMessage :: String
                            }
 
@@ -309,9 +310,9 @@ value sess h = do
 set :: Session -> NodeHandle -> NodeValue -> IO ()
 set sess h val =
     case val of
-        SingleValue v -> 
+        SingleValue v ->
             void $ invoke sess h "set" [enc v]
-        MultiValue vs -> 
+        MultiValue vs ->
             void $ invoke sess h "set" (map enc vs)
 
 isMultipleSelect :: Session -> NodeHandle -> IO Bool

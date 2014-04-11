@@ -20,13 +20,12 @@ import           Control.Monad.Base
 import           Control.Monad.State
 import           Control.Monad.Trans.Control
 
-import           Happybara.Classes
+import           Happybara.Driver
 import           Happybara.WebKit.Session
 import           Happybara.WebKit.Commands   as CMD
 
 instance Driver Session where
     data Node Session = WebKitNode !Text deriving (Show)
-    waitNested = error "NOT IMPLEMENTED"
     currentUrl sess = do
         CMD.currentUrl sess
     visit sess url = CMD.visit sess url

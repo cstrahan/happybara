@@ -19,14 +19,18 @@ import           Data.List
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 
-import           Happybara.Classes           (Driver, Exactness (..),
-                                              HappybaraT, Node, NodeValue (..),
-                                              Query, SingleMatchStrategy (..),
-                                              find, findAll, findOrFail)
-import qualified Happybara.Classes           as D
+import qualified Happybara.Driver            as D
+import           Happybara.Driver            (Driver, Node, NodeValue (..))
 import           Happybara.Exceptions
+import           Happybara.Monad
 import qualified Happybara.Monad             as M
 import qualified Happybara.XPath             as X
+
+class (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => Query q sess m where
+    queryDescription :: q sess m -> String
+    find             :: q sess m -> HappybaraT sess m (Maybe (Node sess))
+    findOrFail       :: q sess m -> HappybaraT sess m (Node sess)
+    findAll          :: q sess m -> HappybaraT sess m [Node sess]
 
 -- instances
 

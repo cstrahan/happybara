@@ -1,26 +1,15 @@
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE OverloadedStrings #-}
 
-import           Happybara.Classes        (Driver, Happybara, HappybaraT,
-                                           NodeValue (..), findOrFail)
-import           Happybara.Monad
-import           Happybara.Query
-import           Happybara.WebKit.Driver
-import           Happybara.WebKit.Session
-import qualified Happybara.XPath          as XPath
+import           Happybara
+import           Happybara.WebKit
 
-import           Control.Applicative
 import           Control.Monad.Base
-import           Control.Monad.State
 
-import qualified Data.ByteString.Char8    as BS
-import           Data.Text                as T
-import           Data.Text.Encoding       as T
+import qualified Data.ByteString.Char8 as BS
+import           Data.Text             as T
+import           Data.Text.Encoding    as T
 
-import qualified System.IO                as IO
+import qualified System.IO             as IO
 
 main :: IO ()
 main = run $ do
@@ -45,4 +34,4 @@ run act = do
 
 puts :: Text -> Happybara sess ()
 puts txt = do
-    liftIO $ BS.hPutStrLn IO.stdout $ T.encodeUtf8 txt
+    liftBase $ BS.hPutStrLn IO.stdout $ T.encodeUtf8 txt

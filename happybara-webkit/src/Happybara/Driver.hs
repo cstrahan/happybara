@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
-module Happybara.Classes where
+module Happybara.Driver where
 
 import           Data.Aeson
 import           Data.ByteString             (ByteString)
@@ -60,36 +60,8 @@ data FrameSelector = FrameIndex Int
                    | DefaultFrame
                    deriving (Eq, Show)
 
-data Exactness = Exact
-               | PreferExact
-               | Inexact
-               deriving (Eq, Ord, Show)
-
-data SingleMatchStrategy = MatchOne
-                         | MatchFirst
-
-data HappybaraState sess = HappybaraState { driver              :: sess
-                                          , wait                :: Double
-                                          , exactness           :: Exactness
-                                          , isSynced            :: Bool
-                                          , singleMatchStrategy :: SingleMatchStrategy
-                                          , currentNode         :: Maybe (Node sess)
-                                          }
-
-type Happybara sess a = HappybaraT sess IO a
-newtype HappybaraT sess m a = HappybaraT { unHappybaraT :: StateT (HappybaraState sess) m a }
-                              deriving (Functor, Applicative, Monad, MonadTrans, MonadIO)
-
-class (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => Query q sess m where
-    queryDescription :: q sess m -> String
-    find             :: q sess m -> HappybaraT sess m (Maybe (Node sess))
-    findOrFail       :: q sess m -> HappybaraT sess m (Node sess)
-    findAll          :: q sess m -> HappybaraT sess m [Node sess]
-
 class Driver sess where
     data Node sess :: *
-    -- | @waitNested@ is
-    waitNested      :: sess -> Double -> IO a -> IO a
     currentUrl      :: sess -> IO Text
     visit           :: sess -> Text -> IO ()
     findXPath       :: sess -> Text -> IO [Node sess]

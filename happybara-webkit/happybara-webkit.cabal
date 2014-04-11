@@ -18,7 +18,8 @@ cabal-version:       >=1.10
 data-dir:            data/
 
 library
-  exposed-modules:     Happybara.Classes,
+  exposed-modules:     Happybara,
+                       Happybara.Driver,
                        Happybara.Exceptions,
                        Happybara.Monad,
                        Happybara.Query,

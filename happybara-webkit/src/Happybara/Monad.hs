@@ -47,12 +47,33 @@ import qualified Network.Socket              as Net
 
 import           System.Info                 (os)
 
-import           Happybara.Classes
-import qualified Happybara.Classes           as D
+import           Happybara.Driver            (Driver, Node, FrameSelector (..),
+                                              NodeValue (..))
+import qualified Happybara.Driver            as D
 import           Happybara.Exceptions
 import           Happybara.WebKit.Exceptions
 import qualified Happybara.XPath             as X
 import           Paths_happybara_webkit      (getDataFileName)
+
+data Exactness = Exact
+               | PreferExact
+               | Inexact
+               deriving (Eq, Ord, Show)
+
+data SingleMatchStrategy = MatchOne
+                         | MatchFirst
+
+data HappybaraState sess = HappybaraState { driver              :: sess
+                                          , wait                :: Double
+                                          , exactness           :: Exactness
+                                          , isSynced            :: Bool
+                                          , singleMatchStrategy :: SingleMatchStrategy
+                                          , currentNode         :: Maybe (Node sess)
+                                          }
+
+type Happybara sess a = HappybaraT sess IO a
+newtype HappybaraT sess m a = HappybaraT { unHappybaraT :: StateT (HappybaraState sess) m a }
+                              deriving (Functor, Applicative, Monad, MonadTrans, MonadIO)
 
 instance (MonadBase b m) => MonadBase b (HappybaraT sess m) where
     liftBase = lift . liftBase
@@ -71,7 +92,6 @@ instance (MonadBaseControl b m) => MonadBaseControl b (HappybaraT sess m) where
     {-# INLINE liftBaseWith #-}
     {-# INLINE restoreM #-}
 
-{- runHappybara :: (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m) -}
 runHappybara :: (Driver sess)
              => sess -> Happybara sess a -> IO a
 runHappybara sess act =
@@ -121,10 +141,20 @@ getCurrentNode :: (Driver sess, Functor m, Monad m) => HappybaraT sess m (Maybe 
 getCurrentNode =
     HappybaraT $ currentNode <$> get
 
-withinNode :: (Driver sess, Functor m, Monad m) => Node sess -> HappybaraT sess m a -> HappybaraT sess m a
+withinNode :: (Driver sess, Functor m, Monad m)
+           => Node sess -> HappybaraT sess m a -> HappybaraT sess m a
 withinNode newNode act = do
     oldNode <- getCurrentNode
     HappybaraT $ modify $ \s -> s { currentNode = Just newNode }
+    res <- act
+    HappybaraT $ modify $ \s -> s { currentNode = oldNode }
+    return res
+
+withinPage :: (Driver sess, Functor m, Monad m)
+           => HappybaraT sess m a -> HappybaraT sess m a
+withinPage act = do
+    oldNode <- getCurrentNode
+    HappybaraT $ modify $ \s -> s { currentNode = Nothing }
     res <- act
     HappybaraT $ modify $ \s -> s { currentNode = oldNode }
     return res
