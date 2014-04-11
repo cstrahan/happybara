@@ -1,4 +1,10 @@
-module Happybara.WebKit.Session where
+module Happybara.WebKit.Session
+    ( Session(..)
+    , withSession
+    , defaultServerPath
+    , mkSession
+    , closeSession
+    ) where
 
 import           Data.Char                   (isDigit)
 import           Data.List                   (isPrefixOf, sort)

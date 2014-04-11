@@ -4,7 +4,37 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
-module Happybara.Query where
+module Happybara.Query
+    ( Query
+    , SimpleQuery(..)
+    , find
+    , findOrFail
+    , findAll
+    , queryDescription
+      -- basic queries
+    , link
+    , button
+    , linkOrButton
+    , fieldset
+    , field
+    , fillableField
+    , select
+    , checkbox
+    , radioButton
+    , fileField
+    , optgroup
+    , option
+    , table
+    , definitionDescription
+      -- predicates
+    , href
+    , checked
+    , unchecked
+    , disabled
+    , selected
+    , options
+    , elemType
+    ) where
 
 import           Control.Applicative
 import           Control.Exception.Lifted
@@ -13,12 +43,12 @@ import           Control.Monad.Base
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Control
 
-import           Data.List
+import           Data.List                   (sort)
 import           Data.Text                   (Text)
 import qualified Data.Text                   as T
 
-import qualified Happybara.Driver            as D
 import           Happybara.Driver            (Driver, Node, NodeValue (..))
+import qualified Happybara.Driver            as D
 import           Happybara.Exceptions
 import           Happybara.Monad
 import qualified Happybara.Monad             as M
