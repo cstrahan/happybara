@@ -1,44 +1,70 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
 
 module Happybara.Query where
 
 import           Control.Applicative
+import           Control.Exception.Lifted
 import           Control.Monad
+import           Control.Monad.Base
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Control
 
 import           Data.List
-import           Data.Text           (Text)
-import qualified Data.Text           as T
+import           Data.Text                   (Text)
+import qualified Data.Text                   as T
 
-import           Happybara.Classes
-import qualified Happybara.XPath     as X
+import           Happybara.Classes           (Driver, Exactness (..),
+                                              HappybaraT, Node, NodeValue (..),
+                                              Query, SingleMatchStrategy (..),
+                                              find, findAll, findOrFail)
+import qualified Happybara.Classes           as D
+import           Happybara.Exceptions
+import qualified Happybara.Monad             as M
+import qualified Happybara.XPath             as X
 
 -- instances
 
-data SimpleQuery sess where
+data SimpleQuery sess m where
     MkSimpleQuery :: (Driver sess)
-                  => Exactness
-                  -> (Bool -> Text)
-                  -> (Maybe (Node sess))
-                  -> [sess -> (Node sess) -> IO Bool]
+                  => (Bool -> Text)
+                  -> [(Node sess) -> HappybaraT sess m Bool]
                   -> Text
-                  -> SimpleQuery sess
+                  -> SimpleQuery sess m
 
-instance Query (SimpleQuery sess) where
-    type QueryDriver (SimpleQuery sess) = sess
-
-    queryDescription (MkSimpleQuery _ _ _ _ desc) =
+instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
+      => Query SimpleQuery sess m where
+    queryDescription (MkSimpleQuery _ _ desc) =
         T.unpack desc
 
-    relativeTo' (MkSimpleQuery a b _ c d) rel =
-        MkSimpleQuery a b rel c d
+    find q = do
+        (Just <$> findOrFail q) `catch` (\(e :: InvalidElementException) ->
+            return $ Nothing)
 
-    withExactness (MkSimpleQuery _ a b c d) exact =
-        MkSimpleQuery exact a b c d
+    findOrFail q@(MkSimpleQuery xpath preds _) = do
+        M.synchronize $ do
+            matchStrategy <- M.getSingleMatchStrategy
+            results <- findAll q
+            when (null results) $ do
+              liftBase $ throw ElementNotFoundException
+            case matchStrategy of
+                MatchFirst -> return $ head results
+                MatchOne -> do
+                    if isAmbiguous results
+                      then liftBase $ throw AmbiguousElementException
+                      else return $ head results
+      where
+        isAmbiguous (n1:n2:_) = True
+        isAmbiguous _         = False
 
-    findAll sess (MkSimpleQuery exact xpath mrel preds _) =
-        case exact of
+    findAll (MkSimpleQuery xpath preds _) = do
+        exactness <- M.getExactness
+        case exactness of
             Exact -> do
                 find $ xpath True
             PreferExact -> do
@@ -51,122 +77,133 @@ instance Query (SimpleQuery sess) where
       where
         allM _ []     = return True
         allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
-        pred x = allM (\p -> p sess x) preds
+        compositePredicate n = allM (\p -> p n) preds
         find x = do
-            res <- case mrel of
-                       Just node -> findXPathRel sess node x
-                       _         -> findXPath sess x
-            filterM pred res
-
--- exactness in matching
-
-exact :: (Query q) => q -> q
-exact = flip withExactness Exact
-
-preferExact :: (Query q) => q -> q
-preferExact = flip withExactness PreferExact
-
-inexact :: (Query q) => q -> q
-inexact = flip withExactness Inexact
+            res <- M.findXPath x
+            filterM compositePredicate res
 
 -- basic queries
 
-link :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+mkQuery :: (Driver sess) => Text -> Text -> (Text -> Bool -> Text) -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
+mkQuery ty locator xpath preds =
+    MkSimpleQuery (xpath locator) preds (locatorDescription ty locator)
+  where
+    escapeText = T.pack . show
+    locatorDescription ty locator =
+        T.concat [ty, ": ", escapeText locator]
+
+link :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 link locator preds =
-    MkSimpleQuery PreferExact (X.link locator) Nothing preds "link"
+    mkQuery "link" locator X.link preds
 
-button :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+button :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 button locator preds =
-    MkSimpleQuery PreferExact (X.button locator) Nothing preds "button"
+    mkQuery "button" locator X.button preds
 
-linkOrButton :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+linkOrButton :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 linkOrButton locator preds =
-    MkSimpleQuery PreferExact (X.linkOrButton locator) Nothing preds "linkOrButton"
+    mkQuery "linkOrButton" locator X.linkOrButton preds
 
-fieldset :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+fieldset :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 fieldset locator preds =
-    MkSimpleQuery PreferExact (X.fieldset locator) Nothing preds "fieldset"
+    mkQuery "fieldset" locator X.fieldset preds
 
-field :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+field :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 field locator preds =
-    MkSimpleQuery PreferExact (X.field locator) Nothing preds "field"
+    mkQuery "field" locator X.field preds
 
-fillableField :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+fillableField :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 fillableField locator preds =
-    MkSimpleQuery PreferExact (X.fillableField locator) Nothing preds "fillableField"
+    mkQuery "fillableField" locator X.fillableField preds
 
-select :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+select :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 select locator preds =
-    MkSimpleQuery PreferExact (X.select locator) Nothing preds "select"
+    mkQuery "select" locator X.select preds
 
-checkbox :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+checkbox :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 checkbox locator preds =
-    MkSimpleQuery PreferExact (X.checkbox locator) Nothing preds "checkbox"
+    mkQuery "checkbox" locator X.checkbox preds
 
-radioButton :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+radioButton :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 radioButton locator preds =
-    MkSimpleQuery PreferExact (X.radioButton locator) Nothing preds "radioButton"
+    mkQuery "radioButton" locator X.radioButton preds
 
-fileField :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+fileField :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 fileField locator preds =
-    MkSimpleQuery PreferExact (X.fileField locator) Nothing preds "fileField"
+    mkQuery "fileField" locator X.fileField preds
 
-optgroup :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+optgroup :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 optgroup locator preds =
-    MkSimpleQuery PreferExact (X.optgroup locator) Nothing preds "optgroup"
+    mkQuery "optgroup" locator X.optgroup preds
 
-option :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+option :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 option locator preds =
-    MkSimpleQuery PreferExact (X.option locator) Nothing preds "option"
+    mkQuery "option" locator X.option preds
 
-table :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+table :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 table locator preds =
-    MkSimpleQuery PreferExact (X.table locator) Nothing preds "table"
+    mkQuery "table" locator X.table preds
 
-definitionDescription :: (Driver sess) => Text -> [sess -> Node sess -> IO Bool] -> SimpleQuery sess
+definitionDescription :: (Driver sess) => Text -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 definitionDescription locator preds =
-    MkSimpleQuery PreferExact (const $ X.definitionDescription locator) Nothing preds "definitionDescription"
+    mkQuery "definitionDescription" locator (const . X.definitionDescription) preds
 
 -- predicates
 
-href :: (Driver sess) => Text -> sess -> Node sess -> IO Bool
-href url sess node =
-    (not . null) <$> findXPathRel sess node xpath
+href :: (Driver sess, MonadBase IO m) => Text -> Node sess -> HappybaraT sess m Bool
+href url node = do
+    driver <- M.getDriver
+    liftBase $ do
+        (not . null) <$> D.findXPathRel driver node xpath
   where
     xpath = T.concat ["./self::*[./@href = ", X.stringLiteral url, "]"]
 
-checked :: (Driver sess) => Bool -> sess -> Node sess -> IO Bool
-checked b sess node =
-    (b==) <$> isChecked sess node
+checked :: (Driver sess, MonadBase IO m) => Bool -> Node sess -> HappybaraT sess m Bool
+checked b node = do
+    driver <- M.getDriver
+    liftBase $ do
+        (b==) <$> D.isChecked driver node
 
-unchecked :: (Driver sess) => Bool -> sess -> Node sess -> IO Bool
-unchecked b sess node =
-    (b/=) <$> isChecked sess node
+unchecked :: (Driver sess, MonadBase IO m) => Bool -> Node sess -> HappybaraT sess m Bool
+unchecked b node = do
+    driver <- M.getDriver
+    liftBase $ do
+        (b/=) <$> D.isChecked driver node
 
-disabled :: (Driver sess) => Bool -> sess -> Node sess -> IO Bool
-disabled b sess node = do
-    name <- tagName sess node
-    if name == "a"
-      then return True
-      else (b==) <$> isDisabled sess node
+disabled :: (Driver sess, MonadBase IO m) => Bool -> Node sess -> HappybaraT sess m Bool
+disabled b node = do
+    driver <- M.getDriver
+    liftBase $ do
+        name <- D.tagName driver node
+        if name == "a"
+          then return True
+          else (b==) <$> D.isDisabled driver node
 
-selected :: (Driver sess) => NodeValue -> sess -> Node sess -> IO Bool
-selected (SingleValue val) sess node =
-    ((SingleValue val) ==) <$> getValue sess node
-selected (MultiValue vals) sess node = do
-    opts <- findXPathRel sess node ".//option"
-    seld <- filterM (isSelected sess) opts
-    texts <- mapM (visibleText sess) seld
-    return $ sort vals == sort texts
+selected :: (Driver sess, MonadBase IO m) => NodeValue -> Node sess -> HappybaraT sess m Bool
+selected (SingleValue val) node = do
+    driver <- M.getDriver
+    liftBase $ do
+        ((SingleValue val) ==) <$> D.getValue driver node
+selected (MultiValue vals) node = do
+    driver <- M.getDriver
+    liftBase $ do
+        opts <- D.findXPathRel driver node ".//option"
+        seld <- filterM (D.isSelected driver) opts
+        texts <- mapM (D.visibleText driver) seld
+        return $ sort vals == sort texts
 
-options :: (Driver sess) => [Text] -> sess -> Node sess -> IO Bool
-options opts sess node = do
-    options <- findXPathRel sess node ".//option"
-    actual <- mapM (visibleText sess) options
-    return $ (sort opts) == (sort actual)
+options :: (Driver sess, MonadBase IO m) => [Text] -> Node sess -> HappybaraT sess m Bool
+options opts node = do
+    driver <- M.getDriver
+    liftBase $ do
+        options <- D.findXPathRel driver node ".//option"
+        actual <- mapM (D.visibleText driver) options
+        return $ (sort opts) == (sort actual)
 
-elemType :: (Driver sess) => Text -> sess -> Node sess -> IO Bool
-elemType t sess node =
-    if any (t==) ["textarea", "select"]
-      then (t==) <$> tagName sess node
-      else (Just t==) <$> attr sess node "type"
+elemType :: (Driver sess, MonadBase IO m) => Text -> Node sess -> HappybaraT sess m Bool
+elemType t node = do
+    driver <- M.getDriver
+    liftBase $ do
+        if any (t==) ["textarea", "select"]
+          then (t==) <$> D.tagName driver node
+          else (Just t==) <$> D.attr driver node "type"

@@ -20,6 +20,7 @@ data-dir:            data/
 library
   exposed-modules:     Happybara.Classes,
                        Happybara.Exceptions,
+                       Happybara.Monad,
                        Happybara.Query,
                        Happybara.WebKit,
                        Happybara.WebKit.Commands,
@@ -38,7 +39,9 @@ library
                        monad-control,
                        lifted-base,
                        data-default,
+                       transformers,
                        transformers-base,
+                       time,
                        text,
                        http-types,
                        filepath,

@@ -1,12 +1,14 @@
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 module Happybara.Classes where
 
@@ -24,8 +26,14 @@ import qualified Data.Word8                  as BS
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Exception
+import           Control.Exception.Lifted
 import           Control.Monad
+import           Control.Monad.Base
+import           Control.Monad.Identity
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Control
+import           Control.Monad.Trans.State
 
 import           System.FilePath
 import           System.IO
@@ -41,7 +49,7 @@ import           System.Info                 (os)
 import           Happybara.Exceptions
 import           Happybara.WebKit.Exceptions
 import qualified Happybara.XPath             as X
-import           Paths_happybara_webkit      (getDataFileName, getLibexecDir)
+import           Paths_happybara_webkit      (getDataFileName)
 
 data NodeValue = SingleValue Text
                | MultiValue [Text]
@@ -57,42 +65,26 @@ data Exactness = Exact
                | Inexact
                deriving (Eq, Ord, Show)
 
-class Query q where
-    type QueryDriver q :: *
+data SingleMatchStrategy = MatchOne
+                         | MatchFirst
 
-    queryDescription :: q -> String
+data HappybaraState sess = HappybaraState { driver              :: sess
+                                          , wait                :: Double
+                                          , exactness           :: Exactness
+                                          , isSynced            :: Bool
+                                          , singleMatchStrategy :: SingleMatchStrategy
+                                          , currentNode         :: Maybe (Node sess)
+                                          }
 
-    withExactness    :: q -> Exactness -> q
+type Happybara sess a = HappybaraT sess IO a
+newtype HappybaraT sess m a = HappybaraT { unHappybaraT :: StateT (HappybaraState sess) m a }
+                              deriving (Functor, Applicative, Monad, MonadTrans, MonadIO)
 
-    relativeTo'      :: q -> Maybe (Node (QueryDriver q)) -> q
-
-    relativeTo       :: q -> Node (QueryDriver q) -> q
-    relativeTo q n =
-        relativeTo' q (Just n)
-
-    findAll          :: (QueryDriver q) -> q -> IO [Node (QueryDriver q)]
-
-    findFirst        :: (QueryDriver q) -> q -> IO (Maybe (Node (QueryDriver q)))
-    findFirst sess q =
-        findAll sess q >>= go
-      where
-        go (node:_) = return $ Just node
-        go []       = return $ Nothing
-
-    findFirstOrFail  :: (Query q) => (QueryDriver q) -> q -> IO (Node (QueryDriver q))
-    findFirstOrFail sess q = do
-        mnode <- findFirst sess q
-        case mnode of
-            Just mnode -> return mnode
-            _          -> throw ElementNotFoundException
-
-    findOneOrFail    :: (Query q) => (QueryDriver q) -> q -> IO (Node (QueryDriver q))
-    findOneOrFail sess q =
-        findAll sess q >>= go
-      where
-        go (node:[]) = return node
-        go (node:_)  = throw AmbiguousElementException
-        go []        = throw ElementNotFoundException
+class (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => Query q sess m where
+    queryDescription :: q sess m -> String
+    find             :: q sess m -> HappybaraT sess m (Maybe (Node sess))
+    findOrFail       :: q sess m -> HappybaraT sess m (Node sess)
+    findAll          :: q sess m -> HappybaraT sess m [Node sess]
 
 class Driver sess where
     data Node sess :: *
@@ -110,8 +102,8 @@ class Driver sess where
     saveScreenshot  :: sess -> Text -> Int -> Int -> IO ()
     responseHeaders :: sess -> IO ResponseHeaders
     statusCode      :: sess -> IO Status
-    withinFrame     :: sess -> FrameSelector -> IO a -> IO a
-    withinWindow    :: sess -> Text -> IO a -> IO a
+    setFrameFocus   :: sess -> FrameSelector -> IO ()
+    setWindowFocus  :: sess -> Text -> IO ()
     reset           :: sess -> IO ()
     findXPathRel    :: sess -> Node sess -> Text -> IO [Node sess]
     findCSSRel      :: sess -> Node sess -> Text -> IO [Node sess]

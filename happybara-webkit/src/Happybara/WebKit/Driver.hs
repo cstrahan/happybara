@@ -50,12 +50,9 @@ instance Driver Session where
         CMD.responseHeaders sess
     statusCode sess = do
         toEnum <$> CMD.statusCode sess
-    withinFrame sess frameId act = do
-        bracket_
-            (CMD.setFrameFocus sess frameId)
-            (CMD.setFrameFocus sess DefaultFrame)
-            (act)
-    withinWindow sess name m = error "NOT IMPLEMENTED"
+    setFrameFocus sess frameId = do
+        CMD.setFrameFocus sess frameId
+    setWindowFocus sess name = error "NOT IMPLEMENTED"
     reset sess = do
         CMD.reset sess
     findXPathRel sess (WebKitNode h) query = do
