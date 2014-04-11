@@ -1,10 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE ExistentialQuantification  #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Happybara.WebKit.Driver where
 
@@ -21,8 +15,8 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Control
 
 import           Happybara.Driver
-import           Happybara.WebKit.Session
 import           Happybara.WebKit.Commands   as CMD
+import           Happybara.WebKit.Session
 
 instance Driver Session where
     data Node Session = WebKitNode !Text deriving (Show)

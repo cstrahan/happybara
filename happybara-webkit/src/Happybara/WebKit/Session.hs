@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module Happybara.WebKit.Session where
 
 import           Data.Char                   (isDigit)
@@ -74,5 +72,5 @@ closeSession sess = do
     hClose (sockHandle sess)
     terminateProcess (procHandle sess)
 
-noDetectError :: forall t. t
+noDetectError :: t
 noDetectError = error "could not detect webkit_server port"

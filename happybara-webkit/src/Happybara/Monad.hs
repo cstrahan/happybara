@@ -1,12 +1,7 @@
-{-# LANGUAGE DeriveDataTypeable         #-}
-{-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
@@ -47,7 +42,7 @@ import qualified Network.Socket              as Net
 
 import           System.Info                 (os)
 
-import           Happybara.Driver            (Driver, Node, FrameSelector (..),
+import           Happybara.Driver            (Driver, FrameSelector (..), Node,
                                               NodeValue (..))
 import qualified Happybara.Driver            as D
 import           Happybara.Exceptions
@@ -63,12 +58,12 @@ data Exactness = Exact
 data SingleMatchStrategy = MatchOne
                          | MatchFirst
 
-data HappybaraState sess = HappybaraState { driver              :: sess
-                                          , wait                :: Double
-                                          , exactness           :: Exactness
-                                          , isSynced            :: Bool
-                                          , singleMatchStrategy :: SingleMatchStrategy
-                                          , currentNode         :: Maybe (Node sess)
+data HappybaraState sess = HappybaraState { hsDriver              :: sess
+                                          , hsWait                :: Double
+                                          , hsExactness           :: Exactness
+                                          , hsIsSynced            :: Bool
+                                          , hsSingleMatchStrategy :: SingleMatchStrategy
+                                          , hsCurrentNode         :: Maybe (Node sess)
                                           }
 
 type Happybara sess a = HappybaraT sess IO a
@@ -97,80 +92,80 @@ runHappybara :: (Driver sess)
 runHappybara sess act =
     evalStateT (unHappybaraT act) initialState
   where
-    initialState = HappybaraState { driver = sess
-                                  , wait = 2
-                                  , exactness = Inexact
-                                  , isSynced = False
-                                  , singleMatchStrategy = MatchOne
-                                  , currentNode = Nothing
+    initialState = HappybaraState { hsDriver = sess
+                                  , hsWait = 2
+                                  , hsExactness = Inexact
+                                  , hsIsSynced = False
+                                  , hsSingleMatchStrategy = MatchOne
+                                  , hsCurrentNode = Nothing
                                   }
 
 setWait :: (Monad m) => Double -> HappybaraT sess m ()
 setWait time =
-    HappybaraT $ modify $ \s -> s { wait = time }
+    HappybaraT $ modify $ \s -> s { hsWait = time }
 
 getWait :: (Functor m, Monad m) => HappybaraT sess m Double
 getWait =
-    HappybaraT $ wait <$> get
+    HappybaraT $ hsWait <$> get
 
 setExactness :: (Monad m) => Exactness -> HappybaraT sess m ()
 setExactness exact =
-    HappybaraT $ modify $ \s -> s { exactness = exact }
+    HappybaraT $ modify $ \s -> s { hsExactness = exact }
 
 getExactness :: (Functor m, Monad m) => HappybaraT sess m Exactness
 getExactness =
-    HappybaraT $ exactness <$> get
+    HappybaraT $ hsExactness <$> get
 
 setDriver :: (Monad m) => sess -> HappybaraT sess m ()
 setDriver d =
-    HappybaraT $ modify $ \s -> s { driver = d }
+    HappybaraT $ modify $ \s -> s { hsDriver = d }
 
 getDriver :: (Functor m, Monad m) => HappybaraT sess m sess
 getDriver =
-    HappybaraT $ driver <$> get
+    HappybaraT $ hsDriver <$> get
 
 setSingleMatchStrategy :: (Monad m) => SingleMatchStrategy -> HappybaraT sess m ()
 setSingleMatchStrategy strategy =
-    HappybaraT $ modify $ \s -> s { singleMatchStrategy = strategy }
+    HappybaraT $ modify $ \s -> s { hsSingleMatchStrategy = strategy }
 
 getSingleMatchStrategy :: (Functor m, Monad m) => HappybaraT sess m SingleMatchStrategy
 getSingleMatchStrategy =
-    HappybaraT $ singleMatchStrategy <$> get
+    HappybaraT $ hsSingleMatchStrategy <$> get
 
 getCurrentNode :: (Driver sess, Functor m, Monad m) => HappybaraT sess m (Maybe (Node sess))
 getCurrentNode =
-    HappybaraT $ currentNode <$> get
+    HappybaraT $ hsCurrentNode <$> get
 
 withinNode :: (Driver sess, Functor m, Monad m)
            => Node sess -> HappybaraT sess m a -> HappybaraT sess m a
 withinNode newNode act = do
     oldNode <- getCurrentNode
-    HappybaraT $ modify $ \s -> s { currentNode = Just newNode }
+    HappybaraT $ modify $ \s -> s { hsCurrentNode = Just newNode }
     res <- act
-    HappybaraT $ modify $ \s -> s { currentNode = oldNode }
+    HappybaraT $ modify $ \s -> s { hsCurrentNode = oldNode }
     return res
 
 withinPage :: (Driver sess, Functor m, Monad m)
            => HappybaraT sess m a -> HappybaraT sess m a
 withinPage act = do
     oldNode <- getCurrentNode
-    HappybaraT $ modify $ \s -> s { currentNode = Nothing }
+    HappybaraT $ modify $ \s -> s { hsCurrentNode = Nothing }
     res <- act
-    HappybaraT $ modify $ \s -> s { currentNode = oldNode }
+    HappybaraT $ modify $ \s -> s { hsCurrentNode = oldNode }
     return res
 
 synchronize :: (Functor m, Monad m, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
             => HappybaraT sess m a -> HappybaraT sess m a
 synchronize act = do
-    synced <- HappybaraT $ isSynced <$> get
+    synced <- HappybaraT $ hsIsSynced <$> get
     if synced
       then act
       else do
           startTime <- liftIO getCurrentTime
           maxWait <- getWait
-          HappybaraT $ modify $ \s -> s { isSynced = True }
+          HappybaraT $ modify $ \s -> s { hsIsSynced = True }
           res <- retry startTime maxWait
-          HappybaraT $ modify $ \s -> s { isSynced = False }
+          HappybaraT $ modify $ \s -> s { hsIsSynced = False }
           return res
   where
     delayMicros = 50000 -- 0.05 seconds
