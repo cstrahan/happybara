@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -31,18 +30,14 @@ class (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => Query q
     findOrFail       :: q sess m -> HappybaraT sess m (Node sess)
     findAll          :: q sess m -> HappybaraT sess m [Node sess]
 
--- instances
-
-data SimpleQuery sess m where
-    MkSimpleQuery :: (Driver sess)
-                  => (Bool -> Text)
-                  -> [(Node sess) -> HappybaraT sess m Bool]
-                  -> Text
-                  -> SimpleQuery sess m
+data SimpleQuery sess m = SimpleQuery { sqXPath       :: (Bool -> Text)
+                                      , sqPredicates  :: [(Node sess) -> HappybaraT sess m Bool]
+                                      , sqDescription :: Text
+                                      }
 
 instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
       => Query SimpleQuery sess m where
-    queryDescription (MkSimpleQuery _ _ desc) =
+    queryDescription (SimpleQuery _ _ desc) =
         T.unpack desc
 
     find q = do
@@ -65,7 +60,7 @@ instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
         isAmbiguous (n1:n2:_) = True
         isAmbiguous _         = False
 
-    findAll (MkSimpleQuery xpath preds _) = do
+    findAll (SimpleQuery xpath preds _) = do
         exactness <- M.getExactness
         case exactness of
             Exact -> do
@@ -89,7 +84,7 @@ instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
 
 mkQuery :: (Driver sess) => Text -> Text -> (Text -> Bool -> Text) -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 mkQuery ty locator xpath preds =
-    MkSimpleQuery (xpath locator) preds (locatorDescription ty locator)
+    SimpleQuery (xpath locator) preds (locatorDescription ty locator)
   where
     escapeText = T.pack . show
     locatorDescription ty locator =
