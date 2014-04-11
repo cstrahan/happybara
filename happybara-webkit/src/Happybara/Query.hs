@@ -10,7 +10,9 @@ module Happybara.Query
     , find
     , findOrFail
     , findAll
-    , queryDescription
+      -- scoping
+    , within
+    , withinAll
       -- basic queries
     , link
     , button
@@ -55,7 +57,6 @@ import qualified Happybara.Monad             as M
 import qualified Happybara.XPath             as X
 
 class (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => Query q sess m where
-    queryDescription :: q sess m -> String
     find             :: q sess m -> HappybaraT sess m (Maybe (Node sess))
     findOrFail       :: q sess m -> HappybaraT sess m (Node sess)
     findAll          :: q sess m -> HappybaraT sess m [Node sess]
@@ -67,9 +68,6 @@ data SimpleQuery sess m = SimpleQuery { sqXPath       :: (Bool -> Text)
 
 instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
       => Query SimpleQuery sess m where
-    queryDescription (SimpleQuery _ _ desc) =
-        T.unpack desc
-
     find q = do
         (Just <$> findOrFail q) `catch` (\(e :: InvalidElementException) ->
             return $ Nothing)
@@ -109,6 +107,18 @@ instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
         find x = do
             res <- M.findXPath x
             filterM compositePredicate res
+
+within :: (Query q sess m, Driver sess, Functor m, Monad m)
+       => q sess m -> HappybaraT sess m a -> HappybaraT sess m a
+within query act = do
+    newNode <- findOrFail query
+    M.withinNode newNode act
+
+withinAll :: (Query q sess m, Driver sess, Functor m, Monad m)
+          => q sess m -> HappybaraT sess m a -> HappybaraT sess m [a]
+withinAll query act = do
+    nodes <- findAll query
+    mapM (flip M.withinNode act) nodes
 
 -- basic queries
 
