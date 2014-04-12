@@ -1,3 +1,3 @@
-[submodule "happybara-webkit/capybara-webkit"]
-	path = happybara-webkit/capybara-webkit
-	url = git://github.com/thoughtbot/capybara-webkit.git
+[submodule "happybara-webkit-server/capybara-webkit"]
+	path = happybara-webkit-server/capybara-webkit
+	url = git://github.com/thoughtbot/capybara-webkit

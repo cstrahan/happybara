@@ -2,6 +2,7 @@
 
 import           Happybara
 import           Happybara.WebKit
+import           Happybara.WebKit.Server
 
 import           Control.Monad.Base
 
@@ -28,10 +29,10 @@ main = run $ do
 
 run :: Happybara Session a -> IO a
 run act = do
-    serverPath <- defaultServerPath
-    withSession serverPath $ \sess -> do
+    serverPath <- webkitServerPath
+    withSession serverPath $ \sess ->
         runHappybara sess act
 
 puts :: Text -> Happybara sess ()
-puts txt = do
+puts txt =
     liftBase $ BS.hPutStrLn IO.stdout $ T.encodeUtf8 txt

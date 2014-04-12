@@ -1,7 +1,6 @@
 module Happybara.WebKit.Session
     ( Session(..)
     , withSession
-    , defaultServerPath
     , mkSession
     , closeSession
     ) where
@@ -25,8 +24,6 @@ import qualified Network.Socket              as Net
 
 import           System.Info                 (os)
 
-import           Paths_happybara_webkit      (getDataFileName, getLibexecDir)
-
 data Session = Session { sock       :: Net.Socket
                        , sockHandle :: Handle
                        , procHandle :: ProcessHandle
@@ -34,11 +31,6 @@ data Session = Session { sock       :: Net.Socket
 
 webkitServerStartTimeout :: Int
 webkitServerStartTimeout = 15 * 1000000
-
-defaultServerPath :: IO FilePath
-defaultServerPath = getDataFileName $ if os == "mingw32"
-                                        then "webkit_server.exe"
-                                        else "webkit_server"
 
 withSession :: FilePath -> (Session -> IO a) -> IO a
 withSession serverPath fun = do

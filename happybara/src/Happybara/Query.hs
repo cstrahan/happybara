@@ -108,6 +108,8 @@ instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
             res <- M.findXPath x
             filterM compositePredicate res
 
+-- scoping
+
 within :: (Query q sess m, Driver sess, Functor m, Monad m)
        => q sess m -> HappybaraT sess m a -> HappybaraT sess m a
 within query act = do

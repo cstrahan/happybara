@@ -9,16 +9,8 @@
 module Happybara.Monad where
 
 import           Data.Aeson
-import           Data.ByteString             (ByteString)
-import qualified Data.ByteString.Char8       as BS
-import           Data.Char                   (isDigit)
-import           Data.List                   (isPrefixOf, sort)
-import           Data.Maybe                  (maybe)
 import           Data.Text                   (Text)
-import qualified Data.Text                   as T
 import           Data.Time.Clock
-import           Data.Typeable
-import qualified Data.Word8                  as BS
 
 import           Control.Applicative
 import           Control.Concurrent
@@ -31,24 +23,12 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Control
 import           Control.Monad.Trans.State
 
-import           System.FilePath
-import           System.IO
-import           System.Process
-import           System.Timeout
-
-import           Network.BSD                 as Net
 import           Network.HTTP.Types          (Header, ResponseHeaders, Status)
-import qualified Network.Socket              as Net
-
-import           System.Info                 (os)
 
 import           Happybara.Driver            (Driver, FrameSelector (..), Node,
                                               NodeValue (..))
 import qualified Happybara.Driver            as D
 import           Happybara.Exceptions
-import           Happybara.WebKit.Exceptions
-import qualified Happybara.XPath             as X
-import           Paths_happybara_webkit      (getDataFileName)
 
 data Exactness = Exact
                | PreferExact
