@@ -184,8 +184,8 @@ setWait :: (Monad m) => Double -> HappybaraT sess m ()
 setWait time =
     HappybaraT $ modify $ \s -> s { hsWait = time }
 
--- | Get the number of seconds to wait between retrying an action (see
--- 'synchronize').
+-- | Get the number of seconds to wait between retrying an action. See
+-- 'synchronize'.
 getWait :: (Functor m, Monad m) => HappybaraT sess m Double
 getWait =
     HappybaraT $ hsWait <$> get
