@@ -234,7 +234,7 @@ getCurrentNode :: (Driver sess, Functor m, Monad m) => HappybaraT sess m (Maybe 
 getCurrentNode =
     HappybaraT $ hsCurrentNode <$> get
 
--- | Set the node that all queries are relative to within the given action.
+-- | Make all queries relative to the supplied node within the given action.
 withinNode :: (Driver sess, Functor m, Monad m)
            => Node sess -> HappybaraT sess m a -> HappybaraT sess m a
 withinNode newNode act = do

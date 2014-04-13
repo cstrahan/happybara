@@ -1,0 +1,7 @@
+* matchers/assertions
+* operations on queries
+  - <action>Node vs <action>
+* prefix some node actions with "get"; rename in Driver
+* hyperlinkify the readme
+* write common testing framework for all drivers
+* write PhantomJS driver
