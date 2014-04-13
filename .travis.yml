@@ -1,0 +1,18 @@
+language: haskell
+ghc:
+  - 7.6
+notifications:
+  email: false
+env:
+  - QMAKE=/usr/lib/x86_64-linux-gnu/qt5/bin/qmake
+before_install:
+  - export DISPLAY=:99.0
+  - /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -ac -screen 0 1280x1024x16
+  - sudo apt-add-repository -y ppa:ubuntu-sdk-team/ppa
+  - sudo apt-get update
+  - sudo apt-get install libqt5webkit5-dev qtdeclarative5-dev qtlocation5-dev qtsensors5-dev libgstreamer0.10-dev libgstreamer-plugins-base0.10-dev qt4-default
+  - cd happybara-webkit && cabal sandbox init
+install:
+  - cabal install --only-dependencies --enable-tests
+script:
+  - cabal configure --enable-tests && cabal build && cabal test

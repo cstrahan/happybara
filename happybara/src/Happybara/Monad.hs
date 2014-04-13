@@ -14,21 +14,22 @@
 -- Stability :  experimental
 --
 module Happybara.Monad
-    ( HappybaraT(..)
+    ( -- * Happybara Monad
+      HappybaraT(..)
     , Happybara
     , runHappybaraT
     , runHappybara
-      -- * Monad Settings/State
+      -- * Monad Settings & State
     , Exactness(..)
     , SingleMatchStrategy(..)
     , setWait
     , getWait
     , setExactness
     , getExactness
-    , getDriver
-    , withDriver
     , setSingleMatchStrategy
     , getSingleMatchStrategy
+    , getDriver
+    , withDriver
     , getCurrentNode
     , HappybaraState(..)
       -- * Browser State
@@ -52,7 +53,7 @@ module Happybara.Monad
       -- * Primitive Queries
     , findXPath
     , findCSS
-      -- * Interacting with Nodes
+      -- * Node Manipulation
     , allText
     , visibleText
     , attr
@@ -177,20 +178,24 @@ runHappybaraT sess act =
                                   , hsCurrentNode = Nothing
                                   }
 
--- | Set the number of seconds to wait between retrying an action (see
--- 'synchronize')
+-- | Set the number of seconds to wait between retrying an action. See
+-- 'synchronize'.
 setWait :: (Monad m) => Double -> HappybaraT sess m ()
 setWait time =
     HappybaraT $ modify $ \s -> s { hsWait = time }
 
+-- | Get the number of seconds to wait between retrying an action (see
+-- 'synchronize').
 getWait :: (Functor m, Monad m) => HappybaraT sess m Double
 getWait =
     HappybaraT $ hsWait <$> get
 
+-- | Set the required level of exactness for queries. See 'Exactness'.
 setExactness :: (Monad m) => Exactness -> HappybaraT sess m ()
 setExactness exact =
     HappybaraT $ modify $ \s -> s { hsExactness = exact }
 
+-- | Get the required level of exactness for queries. See 'Exactness'.
 getExactness :: (Functor m, Monad m) => HappybaraT sess m Exactness
 getExactness =
     HappybaraT $ hsExactness <$> get

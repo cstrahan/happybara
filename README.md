@@ -73,7 +73,7 @@ Let's first look at `main`. In this minimal example, we:
 
 This is just scratching the surface; to get a broader sense of the API,
 you can keep reading this document, or move on to reading the
-[Haddocks](hackage.haskell.org/package/happybara).
+[Haddocks](http://hackage.haskell.org/package/happybara).
 
 Let's change our focus to `run` now. The first thing to notice is that
 we parameterized our Happybara monad with `Happybara.WebKit.Session`;
@@ -99,7 +99,7 @@ because Happybara heavily uses XPath, which doesn't support case
 insensitivity.
 
 Happybara features a rich DOM querying system. Queries are performed via
-the `Query` class and it's respective functions. As we saw earlier,
+the `Query` class and its respective functions. As we saw earlier,
 `button locator predicates` is one example of a query, where `locator` is
 a string denoting an id, value, etc, and `predicates` is a list of
 filters.
@@ -134,7 +134,7 @@ hard with an `AmbiguousElementException`. Using
 * `MatchOne`
 
 By having the matching strategy as part of the monadic state, queries
-compose in convenient, consistent way. For instance, consider the
+compose in a convenient, consistent way. For instance, consider the
 following:
 
 ``` haskell
