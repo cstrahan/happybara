@@ -4,16 +4,20 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 
+-- |
+-- Copyright :  (c) Charles Strahan 2014
+-- License   :  MIT
+-- Maintainer:  Charles Strahan <charles.c.strahan@gmail.com>
+-- Stability :  experimental
+--
 module Happybara.Query
-    ( Query
-    , SimpleQuery(..)
-    , find
-    , findOrFail
-    , findAll
-      -- scoping
+    ( -- * Query Interface
+      Query(find, findOrFail, findAll)
+      -- * Scoping
     , within
     , withinAll
-      -- basic queries
+      -- * Basic Queries
+      -- $queries
     , link
     , button
     , linkOrButton
@@ -28,7 +32,7 @@ module Happybara.Query
     , option
     , table
     , definitionDescription
-      -- predicates
+      -- * Predicates
     , href
     , checked
     , unchecked
@@ -36,6 +40,8 @@ module Happybara.Query
     , selected
     , options
     , elemType
+      -- * Types
+    , SimpleQuery(..)
     ) where
 
 import           Control.Applicative
@@ -56,6 +62,34 @@ import           Happybara.Monad
 import qualified Happybara.Monad             as M
 import qualified Happybara.XPath             as X
 
+-- | This class is the backbone of Happybara's DOM querying DSL.
+-- While Happybara includes support for a number of common queries, you're more than
+-- welcome to implement your own 'Query' instances, thus extending the DSL.
+--
+-- Queries are scoped to the current node as given by 'M.getCurrentNode', and
+-- a new scope can be specified via 'within'.
+--
+-- Note that the behavior of a query is dependent on the current 'M.Exactness' setting:
+--
+-- * 'M.Exact' - Find elements that match exactly.
+--
+-- * 'M.PreferExact' - First try to find exact matches; if that fails, fall
+-- back to inexact matches.
+--
+-- * 'M.Inexact' - Find all elements that partially match - e.g. the given
+-- string is infix of (but not necessarily equal to) whatever property (id,
+-- attribute, etc) is being queried over.
+--
+-- When locating a single item, the failure mode depends on the current 'SingleMatchStrategy' setting:
+--
+-- * 'MatchFirst' - If no elements matched, throw 'ElementNotFoundException';
+-- otherwise, return the first matching element.
+--
+-- * 'MatchOne' - If no elements matched, throw 'ElementNotFoundException'; if
+-- more than element matches, throw 'AmbiguousElementException'.
+--
+-- To set the current 'M.Exactness', use 'M.setExactness'.
+-- To set the current 'M.SingleMatchStrategy', use 'M.setSingleMatchStrategy'.
 class (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => Query q sess m where
     find             :: q sess m -> HappybaraT sess m (Maybe (Node sess))
     findOrFail       :: q sess m -> HappybaraT sess m (Node sess)
@@ -108,21 +142,31 @@ instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
             res <- M.findXPath x
             filterM compositePredicate res
 
--- scoping
-
+-- | Set the current element scope to the element given by the query.
 within :: (Query q sess m, Driver sess, Functor m, Monad m)
        => q sess m -> HappybaraT sess m a -> HappybaraT sess m a
 within query act = do
     newNode <- findOrFail query
     M.withinNode newNode act
 
+-- | For each element given by the query, set the current scope accordingly and
+-- invoke the monadic action, yielding each result.
 withinAll :: (Query q sess m, Driver sess, Functor m, Monad m)
           => q sess m -> HappybaraT sess m a -> HappybaraT sess m [a]
 withinAll query act = do
     nodes <- findAll query
     mapM (flip M.withinNode act) nodes
 
--- basic queries
+-- $queries
+-- Happybara includes a number of queries for common cases where you want to
+-- find an element by value, title, id, alt-text, etc.
+-- These queries can be further filtered by the predicates listed below.
+--
+-- For example, this query will return all enabled buttons matching \"Submit Application\":
+--
+-- @
+--'findAll' $ 'button' \"Submit Application\" [ 'disabled' False ]
+-- @
 
 mkQuery :: (Driver sess) => Text -> Text -> (Text -> Bool -> Text) -> [Node sess -> HappybaraT sess m Bool] -> SimpleQuery sess m
 mkQuery ty locator xpath preds =

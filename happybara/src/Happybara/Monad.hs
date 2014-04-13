@@ -6,7 +6,76 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
-module Happybara.Monad where
+
+-- |
+-- Copyright :  (c) Charles Strahan 2014
+-- License   :  MIT
+-- Maintainer:  Charles Strahan <charles.c.strahan@gmail.com>
+-- Stability :  experimental
+--
+module Happybara.Monad
+    ( HappybaraT(..)
+    , Happybara
+    , runHappybaraT
+    , runHappybara
+      -- * Monad Settings/State
+    , Exactness(..)
+    , SingleMatchStrategy(..)
+    , setWait
+    , getWait
+    , setExactness
+    , getExactness
+    , getDriver
+    , withDriver
+    , setSingleMatchStrategy
+    , getSingleMatchStrategy
+    , getCurrentNode
+    , HappybaraState(..)
+      -- * Browser State
+    , visit
+    , currentUrl
+    , responseHeaders
+    , statusCode
+    , html
+    , goBack
+    , goForward
+    , reset
+    , saveScreenshot
+      -- * Scoping
+    , withinNode
+    , withinPage
+    , withinFrame
+    , withinWindow
+      -- * JavaScript Execution
+    , executeScript
+    , evaluateScript
+      -- * Primitive Queries
+    , findXPath
+    , findCSS
+      -- * Interacting with Nodes
+    , allText
+    , visibleText
+    , attr
+    , getValue
+    , setValue
+    , selectOption
+    , unselectOption
+    , click
+    , rightClick
+    , doubleClick
+    , hover
+    , dragTo
+    , tagName
+    , isVisible
+    , isChecked
+    , isSelected
+    , isDisabled
+    , path
+    , trigger
+    , nodeEq
+      -- * Async Support
+    , synchronize
+    ) where
 
 import           Data.Aeson
 import           Data.Text                   (Text)
@@ -30,13 +99,40 @@ import           Happybara.Driver            (Driver, FrameSelector (..), Node,
 import qualified Happybara.Driver            as D
 import           Happybara.Exceptions
 
-data Exactness = Exact
-               | PreferExact
-               | Inexact
+-- |
+-- The Happybara monad transformer.
+--
+-- Requirements:
+--
+-- * The /sess/ session type must be an instance of 'Driver'.
+--
+-- * The inner monad /m/ must be an instance of 'MonadBase' 'IO' /m/, 'MonadIO' /m/, and
+-- 'MonadBaseControl' 'IO' /m/.
+newtype HappybaraT sess m a = HappybaraT { unHappybaraT :: StateT (HappybaraState sess) m a }
+                              deriving (Functor, Applicative, Monad, MonadTrans, MonadIO)
+
+-- |
+-- If you don't want to transform an existing monad, this type synonym
+-- conveniently sets the inner monad to 'IO'.
+type Happybara sess a = HappybaraT sess IO a
+
+-- |
+-- The exactness requirement when using the 'Happybara.Query.Query' DSL.
+data Exactness = Exact       -- ^ Find elements that match exactly.
+               | PreferExact -- ^ First try to find exact matches;
+                             -- if that fails, fall back to inexact matches.
+               | Inexact     -- ^ Find all elements that partially match - e.g.
+                             -- the given string is infix of (but not necessarily equal to)
+                             -- whatever property (id, attribute, etc) is being queried over.
                deriving (Eq, Ord, Show)
 
-data SingleMatchStrategy = MatchOne
-                         | MatchFirst
+-- |
+-- This controls the 'Happybara.Query.Query' behavior of 'Happybara.Query.findOrFail' in
+-- the presence of multiple matches.
+data SingleMatchStrategy = MatchFirst -- ^ If no elements matched, throw 'ElementNotFoundException';
+                                      -- otherwise, return the first matching element.
+                         | MatchOne   -- ^ If no elements matched, throw 'ElementNotFoundException';
+                                      -- if more than element matches, throw 'AmbiguousElementException'.
 
 data HappybaraState sess = HappybaraState { hsDriver              :: sess
                                           , hsWait                :: Double
@@ -45,10 +141,6 @@ data HappybaraState sess = HappybaraState { hsDriver              :: sess
                                           , hsSingleMatchStrategy :: SingleMatchStrategy
                                           , hsCurrentNode         :: Maybe (Node sess)
                                           }
-
-type Happybara sess a = HappybaraT sess IO a
-newtype HappybaraT sess m a = HappybaraT { unHappybaraT :: StateT (HappybaraState sess) m a }
-                              deriving (Functor, Applicative, Monad, MonadTrans, MonadIO)
 
 instance (MonadBase b m) => MonadBase b (HappybaraT sess m) where
     liftBase = lift . liftBase
@@ -61,15 +153,20 @@ instance MonadTransControl (HappybaraT sess) where
     {-# INLINE restoreT #-}
 
 instance (MonadBaseControl b m) => MonadBaseControl b (HappybaraT sess m) where
-    newtype StM ((HappybaraT sess) m) a = StMHappybara {unStMHappybara :: ComposeSt (HappybaraT sess) m a}
+    newtype StM (HappybaraT sess m) a = StMHappybara {unStMHappybara :: ComposeSt (HappybaraT sess) m a}
     liftBaseWith = defaultLiftBaseWith StMHappybara
     restoreM     = defaultRestoreM unStMHappybara
     {-# INLINE liftBaseWith #-}
     {-# INLINE restoreM #-}
 
-runHappybara :: (Driver sess)
-             => sess -> Happybara sess a -> IO a
-runHappybara sess act =
+-- | Evaluate the happybara computation.
+runHappybara :: (Driver sess) => sess -> Happybara sess a -> IO a
+runHappybara = runHappybaraT
+
+-- | Evaluate the happybara computation.
+runHappybaraT :: (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
+              => sess -> HappybaraT sess m a -> m a
+runHappybaraT sess act =
     evalStateT (unHappybaraT act) initialState
   where
     initialState = HappybaraState { hsDriver = sess
@@ -80,6 +177,8 @@ runHappybara sess act =
                                   , hsCurrentNode = Nothing
                                   }
 
+-- | Set the number of seconds to wait between retrying an action (see
+-- 'synchronize')
 setWait :: (Monad m) => Double -> HappybaraT sess m ()
 setWait time =
     HappybaraT $ modify $ \s -> s { hsWait = time }
@@ -96,26 +195,41 @@ getExactness :: (Functor m, Monad m) => HappybaraT sess m Exactness
 getExactness =
     HappybaraT $ hsExactness <$> get
 
-setDriver :: (Monad m) => sess -> HappybaraT sess m ()
-setDriver d =
-    HappybaraT $ modify $ \s -> s { hsDriver = d }
+-- | Use a different driver for the given action.
+--
+-- /Note:/ This sets the current scope via 'withinPage' before invoking the
+-- action, because the current node was acquired from a different driver
+-- instance. Similarly, it's a bad idea to return a 'Node' from this new driver,
+-- as you might try to use it with the wrong driver instance.
+withDriver :: (Driver sess, Functor m, Monad m)
+           => sess -> HappybaraT sess m a -> HappybaraT sess m a
+withDriver driver act = do
+    oldDriver <-getDriver
+    HappybaraT $ modify $ \s -> s { hsDriver = driver }
+    result <- withinPage act
+    HappybaraT $ modify $ \s -> s { hsDriver = oldDriver }
+    return result
 
 getDriver :: (Functor m, Monad m) => HappybaraT sess m sess
 getDriver =
     HappybaraT $ hsDriver <$> get
 
+-- | Set the query matching strategy. See 'SingleMatchStrategy'.
 setSingleMatchStrategy :: (Monad m) => SingleMatchStrategy -> HappybaraT sess m ()
 setSingleMatchStrategy strategy =
     HappybaraT $ modify $ \s -> s { hsSingleMatchStrategy = strategy }
 
+-- | Get the query matching strategy. See 'SingleMatchStrategy'.
 getSingleMatchStrategy :: (Functor m, Monad m) => HappybaraT sess m SingleMatchStrategy
 getSingleMatchStrategy =
     HappybaraT $ hsSingleMatchStrategy <$> get
 
+-- | Get the node that all queries are currently relative to.
 getCurrentNode :: (Driver sess, Functor m, Monad m) => HappybaraT sess m (Maybe (Node sess))
 getCurrentNode =
     HappybaraT $ hsCurrentNode <$> get
 
+-- | Set the node that all queries are relative to within the given action.
 withinNode :: (Driver sess, Functor m, Monad m)
            => Node sess -> HappybaraT sess m a -> HappybaraT sess m a
 withinNode newNode act = do
@@ -125,6 +239,7 @@ withinNode newNode act = do
     HappybaraT $ modify $ \s -> s { hsCurrentNode = oldNode }
     return res
 
+-- | Make all queries relative to the document in the given action.
 withinPage :: (Driver sess, Functor m, Monad m)
            => HappybaraT sess m a -> HappybaraT sess m a
 withinPage act = do
@@ -134,6 +249,23 @@ withinPage act = do
     HappybaraT $ modify $ \s -> s { hsCurrentNode = oldNode }
     return res
 
+-- | Invoke the given action until:
+--
+-- * The action no longer throws 'InvalidElementException', or
+--
+-- * The total duration of the attempts excedes the number of seconds specified by 'getWait', in
+-- which case the exception is rethrown.
+--
+-- A couple notes:
+--
+-- * The action is retried every 0.05 seconds.
+--
+-- * To prevent exponential retrying, any inner calls to 'synchronize' are
+-- ignored.
+--
+-- * Unless you're doing something advanced,
+-- like implementing custom 'Happybara.Query.Query' instances,
+-- you probably don't need to invoke this directly.
 synchronize :: (Functor m, Monad m, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
             => HappybaraT sess m a -> HappybaraT sess m a
 synchronize act = do

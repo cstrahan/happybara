@@ -1,5 +1,11 @@
 {-# LANGUAGE TypeFamilies               #-}
 
+-- |
+-- Copyright :  (c) Charles Strahan 2014
+-- License   :  MIT
+-- Maintainer:  Charles Strahan <charles.c.strahan@gmail.com>
+-- Stability :  experimental
+--
 module Happybara.Driver where
 
 import           Data.Aeson

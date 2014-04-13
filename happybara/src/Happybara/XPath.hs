@@ -3,6 +3,22 @@
 -- This module is generated from the Ruby 'xpath' gem.
 -- See: https://gist.github.com/cstrahan/10015991
 
+-- |
+-- Copyright :  (c) Charles Strahan 2014
+-- License   :  MIT
+-- Maintainer:  Charles Strahan <charles.c.strahan@gmail.com>
+-- Stability :  experimental
+--
+-- This module provides XPath constructors for common HTML queries.
+-- The 'Text' argument is the locator (e.g. id, type, href, etc), and the 'Bool'
+-- argument indicates whether the generated XPath should match exactly or
+-- inexactly.
+--
+-- XPath string literals can be properly quoted and escaped using
+-- 'stringLiteral'.
+--
+-- /Note:/ These functions are mostly meant for internal use;
+-- you probably want to use the queries in "Happybara.Query".
 module Happybara.XPath where
 import           Data.Text as T
 
