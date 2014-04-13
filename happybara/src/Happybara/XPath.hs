@@ -22,6 +22,9 @@
 module Happybara.XPath where
 import           Data.Text as T
 
+normalizeSpace :: Text -> Text
+normalizeSpace = T.unwords . T.words
+
 stringLiteral :: Text -> Text
 stringLiteral str =
     go $ splitOn "'" str
