@@ -289,7 +289,7 @@ synchronize act = do
     retry startTime maxWait =
         act `catch` (\(e :: InvalidElementException) -> do
             currenTime <- liftBase getCurrentTime
-            let elapsedSeconds = fromRational $ toRational $ diffUTCTime startTime currenTime
+            let elapsedSeconds = fromRational $ toRational $ diffUTCTime currenTime startTime
             if elapsedSeconds > maxWait
               then throw e
               else do
