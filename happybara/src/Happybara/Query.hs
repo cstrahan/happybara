@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 -- |
 -- Copyright :  (c) Charles Strahan 2014
@@ -62,6 +63,33 @@ import           Happybara.Monad
 import qualified Happybara.Monad             as M
 import qualified Happybara.XPath             as X
 
+class ToQuery t q sess m | t -> q where
+    toQuery :: (Query q sess m) => t -> q sess m
+
+instance ToQuery (Node sess) MonadicQuery sess m where
+    toQuery = MonadicQuery . return . (:[])
+
+instance ToQuery (Maybe (Node sess)) MonadicQuery sess m where
+    toQuery = MonadicQuery . return . maybe [] (:[])
+
+instance ToQuery [Node sess] MonadicQuery sess m where
+    toQuery = MonadicQuery . return
+
+instance ToQuery (HappybaraT sess m (Node sess)) MonadicQuery sess m where
+    toQuery = MonadicQuery . fmap (:[])
+
+instance ToQuery (HappybaraT sess m (Maybe (Node sess))) MonadicQuery sess m where
+    toQuery = MonadicQuery . fmap (maybe [] (:[]))
+
+instance ToQuery (HappybaraT sess m [Node sess]) MonadicQuery sess m where
+    toQuery = MonadicQuery
+
+instance ToQuery (MonadicQuery sess m) MonadicQuery sess m where
+    toQuery = id
+
+instance ToQuery (SimpleQuery sess m) SimpleQuery sess m where
+    toQuery = id
+
 -- | This class is the backbone of Happybara's DOM querying DSL.
 -- While Happybara includes support for a number of common queries, you're more than
 -- welcome to implement your own 'Query' instances, thus extending the DSL.
@@ -95,10 +123,36 @@ class (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m) => Query q
     findOrFail       :: q sess m -> HappybaraT sess m (Node sess)
     findAll          :: q sess m -> HappybaraT sess m [Node sess]
 
+data MonadicQuery sess m = MonadicQuery { mqAction :: HappybaraT sess m [Node sess] }
+
 data SimpleQuery sess m = SimpleQuery { sqXPath       :: (Bool -> Text)
                                       , sqPredicates  :: [(Node sess) -> HappybaraT sess m Bool]
                                       , sqDescription :: Text
                                       }
+
+instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
+      => Query MonadicQuery sess m where
+    find q = do
+        (Just <$> findOrFail q) `catch` (\(e :: InvalidElementException) ->
+            return $ Nothing)
+
+    findOrFail q = do
+        M.synchronize $ do
+            matchStrategy <- M.getSingleMatchStrategy
+            results <- findAll q
+            when (null results) $ do
+              liftBase $ throw ElementNotFoundException
+            case matchStrategy of
+                MatchFirst -> return $ head results
+                MatchOne -> do
+                    if isAmbiguous results
+                      then liftBase $ throw AmbiguousElementException
+                      else return $ head results
+      where
+        isAmbiguous (n1:n2:_) = True
+        isAmbiguous _         = False
+
+    findAll = mqAction
 
 instance (Driver sess, MonadIO m, MonadBase IO m, MonadBaseControl IO m)
       => Query SimpleQuery sess m where

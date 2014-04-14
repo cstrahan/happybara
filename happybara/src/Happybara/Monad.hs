@@ -100,8 +100,7 @@ import           Happybara.Driver            (Driver, FrameSelector (..), Node,
 import qualified Happybara.Driver            as D
 import           Happybara.Exceptions
 
--- |
--- The Happybara monad transformer.
+-- | The Happybara monad transformer.
 --
 -- Requirements:
 --
@@ -112,13 +111,11 @@ import           Happybara.Exceptions
 newtype HappybaraT sess m a = HappybaraT { unHappybaraT :: StateT (HappybaraState sess) m a }
                               deriving (Functor, Applicative, Monad, MonadTrans, MonadIO)
 
--- |
--- If you don't want to transform an existing monad, this type synonym
+-- | If you don't want to transform an existing monad, this type synonym
 -- conveniently sets the inner monad to 'IO'.
 type Happybara sess a = HappybaraT sess IO a
 
--- |
--- The exactness requirement when using the 'Happybara.Query.Query' DSL.
+-- | The exactness requirement when using the 'Happybara.Query.Query' DSL.
 data Exactness = Exact       -- ^ Find elements that match exactly.
                | PreferExact -- ^ First try to find exact matches;
                              -- if that fails, fall back to inexact matches.
@@ -127,8 +124,7 @@ data Exactness = Exact       -- ^ Find elements that match exactly.
                              -- whatever property (id, attribute, etc) is being queried over.
                deriving (Eq, Ord, Show)
 
--- |
--- This controls the 'Happybara.Query.Query' behavior of 'Happybara.Query.findOrFail' in
+-- | This controls the 'Happybara.Query.Query' behavior of 'Happybara.Query.findOrFail' in
 -- the presence of multiple matches.
 data SingleMatchStrategy = MatchFirst -- ^ If no elements matched, throw 'ElementNotFoundException';
                                       -- otherwise, return the first matching element.
