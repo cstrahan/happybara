@@ -5,3 +5,4 @@
 * hyperlinkify the readme
 * write common testing framework for all drivers
 * write PhantomJS driver
+* port Nokogiri's CSS->XPath converter

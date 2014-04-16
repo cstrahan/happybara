@@ -3,3 +3,4 @@ data/
 
 .cabal-sandbox/
 cabal.sandbox.config
+.vagrant

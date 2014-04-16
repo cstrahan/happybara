@@ -5,6 +5,7 @@ import           Happybara.WebKit
 import           Happybara.WebKit.Server
 
 import           Control.Monad.Base
+import           Control.Monad.Trans.Control
 
 import qualified Data.ByteString.Char8 as BS
 import           Data.Text             as T
@@ -15,16 +16,9 @@ import qualified System.IO             as IO
 main :: IO ()
 main = run $ do
     visit "http://google.com"
-
-    btn <- findOrFail (button "I'm Feeling Lucky" [disabled False])
-    SingleValue value <- getValue btn
-    puts $ T.concat [ "Button found: ", value ]
-
-    click btn
-
+    click $ button "I'm Feeling Lucky" [disabled False]
     url <- currentUrl
     puts $ T.concat [ "New url: ", url ]
-
     return ()
 
 run :: Happybara Session a -> IO a

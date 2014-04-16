@@ -38,6 +38,8 @@ library
                        Happybara.Driver,
                        Happybara.Exceptions,
                        Happybara.Monad,
+                       Happybara.Node,
+                       Happybara.Queries,
                        Happybara.Query,
                        Happybara.XPath
   build-depends:       base >=4.6 && <4.7,

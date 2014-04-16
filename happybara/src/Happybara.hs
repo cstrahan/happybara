@@ -7,12 +7,16 @@
 module Happybara
     ( module Happybara.Monad
     , module Happybara.Query
+    , module Happybara.Queries
+    , module Happybara.Node
     , module Happybara.Driver
     , module Happybara.Exceptions
     ) where
 
-import           Happybara.Monad
-import           Happybara.Query
 import           Happybara.Driver     (Driver, FrameSelector (..), Node,
                                        NodeValue (..))
 import           Happybara.Exceptions
+import           Happybara.Monad
+import           Happybara.Node
+import           Happybara.Queries
+import           Happybara.Query
