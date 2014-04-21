@@ -20,17 +20,93 @@
 -- /Note:/ These functions are mostly meant for internal use;
 -- you probably want to use the queries in "Happybara.Query".
 module Happybara.XPath where
-import           Data.Text as T
+
+import           Data.Maybe    (maybe)
+import           Data.Monoid
+import           Data.Text     (Text)
+import qualified Data.Text     as T
+
+import           Happybara.CSS
 
 normalizeSpace :: Text -> Text
 normalizeSpace = T.unwords . T.words
 
 stringLiteral :: Text -> Text
 stringLiteral str =
-    go $ splitOn "'" str
+    go $ T.splitOn "'" str
   where
     go (x:[]) = T.concat ["'", x, "'"]
     go (xs)   = T.concat ["concat('", T.intercalate "',\"'\",'" xs, "')"]
+
+fromCSS :: [Selector] -> Text
+fromCSS sels =
+    T.intercalate " | " $ map renderSelector sels
+  where
+    renderElem elem = maybe "*" id elem
+
+    renderSelector (SimpleSelector elem constraints) = T.concat $ [ renderElem elem, renderConstraints constraints ]
+    renderSelector (Descendent l r) = T.concat [ renderSelector l, "//", renderSelector r ]
+    renderSelector (ImmediateChild l r) = T.concat [ renderSelector l, "/", renderSelector r ]
+    renderSelector (AdjacentSibling l r) = T.concat [ renderSelector l, "/following-sibling::*[1]/self::", renderSelector r ]
+    renderSelector (PreviousSibling l r) = T.concat [ renderSelector l, "/preceding-sibling::*[1]/self::", renderSelector r ]
+
+    renderConstraints [] = ""
+    renderConstraints cs = T.concat [ "[", T.intercalate " and " $ map renderConstraint cs, "]" ]
+
+    renderConstraint :: Constraint -> Text
+    renderConstraint (Class klass) = T.concat [ "contains(concat(' ', normalize-space(/@class), ' '), '", klass, "')" ]
+    renderConstraint (ID i) = T.concat [ "/@id = ", stringLiteral i ]
+    renderConstraint (HasAttribute attr) = T.concat [ "./@", attr ]
+    renderConstraint (AttributeEquals attr val) = T.concat [ "./@", attr, " = ", renderStr val ]
+    renderConstraint (AttributeContains attr val) = T.concat [ "contains(./@", attr, ", ", renderStr val, ")" ]
+    renderConstraint (AttributeDoesNotContain attr val) = T.concat [ "not(", renderConstraint $ AttributeContains attr val, ")"]
+    renderConstraint (AttributeContainsWord attr val) = T.concat [ "contains(concat(' ', normalize-space(./@", attr, "), ' '), '", (renderStr' " " val " "), "')" ]
+    renderConstraint (AttributeContainsPrefix attr val) = T.concat [ "starts-with(./@", attr, ", ", renderStr  val, ")" ]
+    renderConstraint (AttributeStartsWith attr val) = T.concat [ "starts-with(./@", attr, ", ", renderStr  val, ")" ]
+    renderConstraint (AttributeEndsWith attr val) = T.concat [ "ends-with(./@", attr, ", ", renderStr val, ")" ]
+
+    renderConstraint (PseudoFunc "not" (SelectorArg sel)) = T.concat [ "not(", renderSelector sel, ")" ]
+
+    renderConstraint (PseudoFunc "has" (SelectorArg sel)) = renderSelector sel
+
+    renderConstraint (PseudoFunc "nth-child" (NPlusBArg b)) = T.concat [ "count(preceding-sibling::*) = ", int2txt (b-1) ]
+    renderConstraint (PseudoFunc "nth-last-child" (NPlusBArg b)) = T.concat [ "count(following-sibling::*) = ", int2txt (b-1) ]
+
+    renderConstraint (PseudoFunc "nth-of-type" OddArg) = "(position() mod 2) = 1"
+    renderConstraint (PseudoFunc "nth-of-type" EvenArg) = "(position() mod 2) = 0"
+    renderConstraint (PseudoFunc "nth-of-type" (ANPlusBArg a b)) = nthOfTypeMod a b
+    renderConstraint (PseudoFunc "nth-of-type" (NPlusBArg b)) = nthOfTypeMod 1 b
+    renderConstraint (PseudoFunc "nth-of-type" (ANArg a)) = nthOfTypeMod a 0
+
+    renderConstraint (PseudoFunc "nth-last-of-type" OddArg) = "(position() mod 2) = 1"
+    renderConstraint (PseudoFunc "nth-last-of-type" EvenArg) = "(position() mod 2) = 0"
+    renderConstraint (PseudoFunc "nth-last-of-type" (ANPlusBArg a b)) = nthOfTypeMod a b
+    renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = nthOfTypeMod 1 b
+    renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = nthOfTypeMod a 0
+
+    renderConstraint (PseudoClass "first-of-type") = "position() = 1"
+    renderConstraint (PseudoClass "last-of-type") = "position() = 1"
+    renderConstraint (PseudoClass "first-child" ) = "count(preceding-sibling::*) = 0";
+    renderConstraint (PseudoClass "last-child" ) = "count(following-sibling::*) = 0";
+    renderConstraint (PseudoClass "only-child" ) = "count(preceding-sibling::*) = 0 and count(following-sibling::*) = 0";
+    renderConstraint (PseudoClass "only-of-type" ) = "last() = 1";
+    renderConstraint (PseudoClass "empty" ) = "not(node())";
+
+    nthOfTypeMod a b
+        | a == (-1) = T.concat [ "(position() <= ", int2txt b, ") and (((position() - ", int2txt b, ") mod 1) = 0)" ]
+        | b > 0     = T.concat [ "(position() >= ", int2txt b, ") and (((position() - ", int2txt b, ") mod ", int2txt a, ") = 0)" ]
+        | otherwise = T.concat [ "(position() mod ", int2txt a, ") = 0" ]
+
+    nthLastOfTypeMod a b
+        | a == (-1) = T.concat [ "((last() - position() + 1) <= ", int2txt b, ") and ((((last() - position() + 1) - ", int2txt b, ") mod 1) = 0)" ]
+        | b > 0     = T.concat [ "((last() - position() + 1) >= ", int2txt b, ") and ((((last() - position() + 1) - ", int2txt b, ") mod ", int2txt a, ") = 0)" ]
+        | otherwise = T.concat [ "((last() - position() + 1) mod ", int2txt a, ") = 0" ]
+
+    int2txt i = T.pack $ show (i::Int)
+    identOrStringToString (Ident i) = i
+    identOrStringToString (StringLit lit) = lit
+    renderStr    x   = stringLiteral $ identOrStringToString x
+    renderStr' l x r = stringLiteral $ T.concat [ l, identOrStringToString x, r ]
 
 link :: Text -> Bool -> Text
 link locator exact =
