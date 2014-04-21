@@ -75,7 +75,7 @@ fromCSS css = do
         cs' <- mapM renderConstraint cs
         return $ T.concat [ "[", T.intercalate " and " $ cs', "]" ]
 
-    renderConstraint (Class klass) = return $ T.concat [ "contains(concat(' ', normalize-space(/@class), ' '), '", klass, "')" ]
+    renderConstraint (Class klass) = return $ T.concat [ "contains(concat(' ', normalize-space(/@class), ' '), ' ", klass, " ')" ]
     renderConstraint (ID i) = return $ T.concat [ "/@id = ", stringLiteral i ]
     renderConstraint (HasAttribute attr) = return $ T.concat [ "./@", attr ]
     renderConstraint (AttributeEquals attr val) = return $ T.concat [ "./@", attr, " = ", renderStr val ]
