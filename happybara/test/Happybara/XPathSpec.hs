@@ -4,8 +4,8 @@ module Happybara.XPathSpec where
 
 import           Test.Hspec
 
-import       Data.Text (Text)
-import       qualified    Data.Text as T
+import           Data.Text        (Text)
+import qualified Data.Text        as T
 
 import           Control.Monad
 

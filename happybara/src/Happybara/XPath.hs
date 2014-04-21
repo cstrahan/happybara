@@ -18,14 +18,14 @@
 -- you probably want to use the queries in "Happybara.Query".
 module Happybara.XPath where
 
-import           Data.Maybe    (maybe)
+import           Data.Maybe       (maybe)
 import           Data.Monoid
-import           Data.Text     (Text)
-import qualified Data.Text     as T
+import           Data.Text        (Text)
+import qualified Data.Text        as T
 
 import           Text.Parsec.Prim (runParser)
 
-import     Happybara.CSS
+import           Happybara.CSS
 
 normalizeSpace :: Text -> Text
 normalizeSpace = T.unwords . T.words
