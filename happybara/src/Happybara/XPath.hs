@@ -37,11 +37,13 @@ stringLiteral str =
     go (x:[]) = T.concat ["'", x, "'"]
     go (xs)   = T.concat ["concat('", T.intercalate "',\"'\",'" xs, "')"]
 
-fromCSS :: Text -> Either Text Text
-fromCSS css = do
+fromCSS :: Text -> Text -> Either Text Text
+fromCSS prefix css = do
     ast <- parse $ T.unpack css
-    sels <- mapM renderSelector ast
-    return $ T.intercalate " | " sels
+    sels <- mapM (renderSelector) ast
+    return $ if T.null prefix
+               then T.intercalate " | " sels
+               else prefix <> T.intercalate (" | "<>prefix) sels
   where
     parse txt = fromEither $ runParser selectors () "" txt
       where
@@ -81,7 +83,7 @@ fromCSS css = do
     renderConstraint (AttributeEquals attr val) = return $ T.concat [ "./@", attr, " = ", renderStr val ]
     renderConstraint (AttributeContains attr val) = return $ T.concat [ "contains(./@", attr, ", ", renderStr val, ")" ]
     renderConstraint (AttributeDoesNotContain attr val) = return $ T.concat [ "not(contains(./@", attr, ", ", renderStr val, "))" ]
-    renderConstraint (AttributeContainsWord attr val) = return $ T.concat [ "contains(concat(' ', normalize-space(./@", attr, "), ' '), '", renderStr' " " val " ", "')" ]
+    renderConstraint (AttributeContainsWord attr val) = return $ T.concat [ "contains(concat(' ', normalize-space(./@", attr, "), ' '), ", renderStr' " " val " ", ")" ]
     renderConstraint (AttributeContainsPrefix attr val) = return $ T.concat [ "starts-with(./@", attr, ", ", renderStr' "" val "-", ")" ]
     renderConstraint (AttributeStartsWith attr val) = return $ T.concat [ "starts-with(./@", attr, ", ", renderStr val, ")" ]
     renderConstraint (AttributeEndsWith attr val) = return $ T.concat [ "ends-with(./@", attr, ", ", renderStr val, ")" ]

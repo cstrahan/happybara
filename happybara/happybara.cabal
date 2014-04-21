@@ -60,7 +60,7 @@ library
 
 test-suite spec
   type:                exitcode-stdio-1.0
-  other-modules:       Happybara.CSSSpec
+  -- other-modules:       
   hs-source-dirs:      test
   main-is:             Spec.hs
   --ghc-options:         -Wall -Werror
