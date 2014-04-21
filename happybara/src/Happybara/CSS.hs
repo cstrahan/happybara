@@ -159,11 +159,11 @@ str =
     singleton = (:[])
     single = do
         char '\''
-        s <- many ((singleton <$> noneOf "\\'")
-               <|> try (string "\\'" *> return "'")
-               <|> (string "\\"))
+        s <- many ((noneOf "\\'")
+               <|> try (string "\\'" *> return '\'')
+               <|> (char '\\'))
         char '\''
-        return . T.pack . read $ "\"" <> concat s <> "\""
+        return . T.pack . read $ "\"" <> s <> "\""
     double = do
         char '"'
         s <- many ((singleton <$> noneOf "\\\"")

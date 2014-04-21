@@ -43,7 +43,7 @@ fromCSS css = do
     sels <- mapM renderSelector ast
     return $ T.intercalate " | " sels
   where
-    parse txt = fromEither $ runParser selectors () "<>" txt
+    parse txt = fromEither $ runParser selectors () "" txt
       where
         fromEither (Right x) = Right x
         fromEither (Left msg) = Left $ T.concat [ "css parse error: ", T.pack $ show msg ]
@@ -113,7 +113,7 @@ fromCSS css = do
     renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = return $ nthLastOfTypeMod 1 b
     renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = return $ nthLastOfTypeMod a 0
     renderConstraint (PseudoFunc "nth-last-of-type" _) = Left "invalid argument to :nth-last-of-type"
-    renderConstraint (PseudoFunc sel _) = Left $ T.concat [ "unkown pseudo func :", sel ]
+    renderConstraint (PseudoFunc sel _) = Left $ T.concat [ "unknown pseudo func :", sel ]
 
     renderConstraint (PseudoClass "first-of-type") = return "position() = 1"
     renderConstraint (PseudoClass "last-of-type") = return "position() = last()"
@@ -122,7 +122,7 @@ fromCSS css = do
     renderConstraint (PseudoClass "only-child") = return "count(preceding-sibling::*) = 0 and count(following-sibling::*) = 0"
     renderConstraint (PseudoClass "only-of-type") = return "last() = 1"
     renderConstraint (PseudoClass "empty") = return "not(node())"
-    renderConstraint (PseudoClass sel) = Left $ T.concat [ "unkown pseudo class :", sel ]
+    renderConstraint (PseudoClass sel) = Left $ T.concat [ "unknown pseudo class :", sel ]
 
     nthOfTypeMod a b
         | a == (-1) = T.concat [ "(position() <= ", int2txt b, ") and (((position() - ", int2txt b, ") mod 1) = 0)" ]
