@@ -75,8 +75,8 @@ fromCSS css = do
         cs' <- mapM renderConstraint cs
         return $ T.concat [ "[", T.intercalate " and " $ cs', "]" ]
 
-    renderConstraint (Class klass) = return $ T.concat [ "contains(concat(' ', normalize-space(/@class), ' '), ' ", klass, " ')" ]
-    renderConstraint (ID i) = return $ T.concat [ "/@id = ", stringLiteral i ]
+    renderConstraint (Class klass) = return $ T.concat [ "contains(concat(' ', normalize-space(./@class), ' '), ' ", klass, " ')" ]
+    renderConstraint (ID i) = return $ T.concat [ "./@id = ", stringLiteral i ]
     renderConstraint (HasAttribute attr) = return $ T.concat [ "./@", attr ]
     renderConstraint (AttributeEquals attr val) = return $ T.concat [ "./@", attr, " = ", renderStr val ]
     renderConstraint (AttributeContains attr val) = return $ T.concat [ "contains(./@", attr, ", ", renderStr val, ")" ]
@@ -109,9 +109,9 @@ fromCSS css = do
 
     renderConstraint (PseudoFunc "nth-last-of-type" OddArg) = return "(position() mod 2) = 1"
     renderConstraint (PseudoFunc "nth-last-of-type" EvenArg) = return "(position() mod 2) = 0"
-    renderConstraint (PseudoFunc "nth-last-of-type" (ANPlusBArg a b)) = return $ nthOfTypeMod a b
-    renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = return $ nthOfTypeMod 1 b
-    renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = return $ nthOfTypeMod a 0
+    renderConstraint (PseudoFunc "nth-last-of-type" (ANPlusBArg a b)) = return $ nthLastOfTypeMod a b
+    renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = return $ nthLastOfTypeMod 1 b
+    renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = return $ nthLastOfTypeMod a 0
     renderConstraint (PseudoFunc "nth-last-of-type" _) = Left "invalid argument to :nth-last-of-type"
     renderConstraint (PseudoFunc sel _) = Left $ T.concat [ "unkown pseudo func :", sel ]
 
