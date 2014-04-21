@@ -1,4 +1,4 @@
-{-# OverloadableStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Happybara.CSSSpec where
 
