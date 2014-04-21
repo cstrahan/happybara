@@ -1,8 +1,11 @@
-{-# OverloadableStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Happybara.XPathSpec where
 
 import           Test.Hspec
+
+import       Data.Text (Text)
+import       qualified    Data.Text as T
 
 import           Control.Monad
 
@@ -11,13 +14,6 @@ import           Text.Parsec.Prim (runParser)
 import qualified Happybara.CSS    as C
 import qualified Happybara.XPath  as X
 
-parse txt = fromRight $ runParser C.selectors () "<>" txt
-  where
-    fromRight (Right x) = x
-    fromRight (Left msg) = error $ show msg
-
-convert txt = X.fromCSS $ parse txt
-
 spec :: Spec
 spec = do
     describe "CSS conversion" $ do
@@ -25,8 +21,8 @@ spec = do
 
 runExamples =
     forM_ examples $ \(css, expected) -> do
-        it css $ do
-            print $ convert css
+        it (T.unpack css) $ do
+            print $ X.fromCSS css
 
 examples =
     [ -- simple

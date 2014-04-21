@@ -1,8 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- This module is generated from the Ruby 'xpath' gem.
--- See: https://gist.github.com/cstrahan/10015991
-
 -- |
 -- Copyright :  (c) Charles Strahan 2014
 -- License   :  MIT
@@ -26,7 +23,9 @@ import           Data.Monoid
 import           Data.Text     (Text)
 import qualified Data.Text     as T
 
-import           Happybara.CSS
+import           Text.Parsec.Prim (runParser)
+
+import     Happybara.CSS
 
 normalizeSpace :: Text -> Text
 normalizeSpace = T.unwords . T.words
@@ -38,59 +37,92 @@ stringLiteral str =
     go (x:[]) = T.concat ["'", x, "'"]
     go (xs)   = T.concat ["concat('", T.intercalate "',\"'\",'" xs, "')"]
 
-fromCSS :: [Selector] -> Text
-fromCSS sels =
-    T.intercalate " | " $ map renderSelector sels
+fromCSS :: Text -> Either Text Text
+fromCSS css = do
+    ast <- parse $ T.unpack css
+    sels <- mapM renderSelector ast
+    return $ T.intercalate " | " sels
   where
+    parse txt = fromEither $ runParser selectors () "<>" txt
+      where
+        fromEither (Right x) = Right x
+        fromEither (Left msg) = Left $ T.concat [ "css parse error: ", T.pack $ show msg ]
+
     renderElem elem = maybe "*" id elem
 
-    renderSelector (SimpleSelector elem constraints) = T.concat $ [ renderElem elem, renderConstraints constraints ]
-    renderSelector (Descendent l r) = T.concat [ renderSelector l, "//", renderSelector r ]
-    renderSelector (ImmediateChild l r) = T.concat [ renderSelector l, "/", renderSelector r ]
-    renderSelector (AdjacentSibling l r) = T.concat [ renderSelector l, "/following-sibling::*[1]/self::", renderSelector r ]
-    renderSelector (PreviousSibling l r) = T.concat [ renderSelector l, "/preceding-sibling::*[1]/self::", renderSelector r ]
+    renderSelector (SimpleSelector elem constraints) = do
+        constraints' <- renderConstraints constraints
+        return $ T.concat [ renderElem elem, constraints' ]
+    renderSelector (Descendent l r) = do
+        r' <- renderSelector r
+        l' <- renderSelector l
+        return $ T.concat [ l', "//", r' ]
+    renderSelector (ImmediateChild l r) = do
+        r' <- renderSelector r
+        l' <- renderSelector l
+        return $ T.concat [ l', "/", r' ]
+    renderSelector (AdjacentSibling l r) = do
+        r' <- renderSelector r
+        l' <- renderSelector l
+        return $ T.concat [ l', "/following-sibling::*[1]/self::", r' ]
+    renderSelector (PreviousSibling l r) = do
+        r' <- renderSelector r
+        l' <- renderSelector l
+        return $ T.concat [ l', "/preceding-sibling::*[1]/self::", r' ]
 
-    renderConstraints [] = ""
-    renderConstraints cs = T.concat [ "[", T.intercalate " and " $ map renderConstraint cs, "]" ]
+    renderConstraints [] = return ""
+    renderConstraints cs = do
+        cs' <- mapM renderConstraint cs
+        return $ T.concat [ "[", T.intercalate " and " $ cs', "]" ]
 
-    renderConstraint :: Constraint -> Text
-    renderConstraint (Class klass) = T.concat [ "contains(concat(' ', normalize-space(/@class), ' '), '", klass, "')" ]
-    renderConstraint (ID i) = T.concat [ "/@id = ", stringLiteral i ]
-    renderConstraint (HasAttribute attr) = T.concat [ "./@", attr ]
-    renderConstraint (AttributeEquals attr val) = T.concat [ "./@", attr, " = ", renderStr val ]
-    renderConstraint (AttributeContains attr val) = T.concat [ "contains(./@", attr, ", ", renderStr val, ")" ]
-    renderConstraint (AttributeDoesNotContain attr val) = T.concat [ "not(", renderConstraint $ AttributeContains attr val, ")"]
-    renderConstraint (AttributeContainsWord attr val) = T.concat [ "contains(concat(' ', normalize-space(./@", attr, "), ' '), '", (renderStr' " " val " "), "')" ]
-    renderConstraint (AttributeContainsPrefix attr val) = T.concat [ "starts-with(./@", attr, ", ", renderStr  val, ")" ]
-    renderConstraint (AttributeStartsWith attr val) = T.concat [ "starts-with(./@", attr, ", ", renderStr  val, ")" ]
-    renderConstraint (AttributeEndsWith attr val) = T.concat [ "ends-with(./@", attr, ", ", renderStr val, ")" ]
+    renderConstraint (Class klass) = return $ T.concat [ "contains(concat(' ', normalize-space(/@class), ' '), '", klass, "')" ]
+    renderConstraint (ID i) = return $ T.concat [ "/@id = ", stringLiteral i ]
+    renderConstraint (HasAttribute attr) = return $ T.concat [ "./@", attr ]
+    renderConstraint (AttributeEquals attr val) = return $ T.concat [ "./@", attr, " = ", renderStr val ]
+    renderConstraint (AttributeContains attr val) = return $ T.concat [ "contains(./@", attr, ", ", renderStr val, ")" ]
+    renderConstraint (AttributeDoesNotContain attr val) = return $ T.concat [ "not(contains(./@", attr, ", ", renderStr val, "))" ]
+    renderConstraint (AttributeContainsWord attr val) = return $ T.concat [ "contains(concat(' ', normalize-space(./@", attr, "), ' '), '", renderStr' " " val " ", "')" ]
+    renderConstraint (AttributeContainsPrefix attr val) = return $ T.concat [ "starts-with(./@", attr, ", ", renderStr' "" val "-", ")" ]
+    renderConstraint (AttributeStartsWith attr val) = return $ T.concat [ "starts-with(./@", attr, ", ", renderStr val, ")" ]
+    renderConstraint (AttributeEndsWith attr val) = return $ T.concat [ "ends-with(./@", attr, ", ", renderStr val, ")" ]
 
-    renderConstraint (PseudoFunc "not" (SelectorArg sel)) = T.concat [ "not(", renderSelector sel, ")" ]
+    renderConstraint (PseudoFunc "not" (SelectorArg sel)) = do
+        sel' <- renderSelector sel
+        return $ T.concat [ "not(", sel', ")" ]
+    renderConstraint (PseudoFunc "not" _) = Left "invalid argument to :not"
 
     renderConstraint (PseudoFunc "has" (SelectorArg sel)) = renderSelector sel
+    renderConstraint (PseudoFunc "has" _) = Left "invalid argument to :has"
 
-    renderConstraint (PseudoFunc "nth-child" (NPlusBArg b)) = T.concat [ "count(preceding-sibling::*) = ", int2txt (b-1) ]
-    renderConstraint (PseudoFunc "nth-last-child" (NPlusBArg b)) = T.concat [ "count(following-sibling::*) = ", int2txt (b-1) ]
+    renderConstraint (PseudoFunc "nth-child" (NPlusBArg b)) = return $ T.concat [ "count(preceding-sibling::*) = ", int2txt (b-1) ]
+    renderConstraint (PseudoFunc "nth-child" _) = Left "invalid argument to :nth-child"
 
-    renderConstraint (PseudoFunc "nth-of-type" OddArg) = "(position() mod 2) = 1"
-    renderConstraint (PseudoFunc "nth-of-type" EvenArg) = "(position() mod 2) = 0"
-    renderConstraint (PseudoFunc "nth-of-type" (ANPlusBArg a b)) = nthOfTypeMod a b
-    renderConstraint (PseudoFunc "nth-of-type" (NPlusBArg b)) = nthOfTypeMod 1 b
-    renderConstraint (PseudoFunc "nth-of-type" (ANArg a)) = nthOfTypeMod a 0
+    renderConstraint (PseudoFunc "nth-last-child" (NPlusBArg b)) = return $ T.concat [ "count(following-sibling::*) = ", int2txt (b-1) ]
+    renderConstraint (PseudoFunc "nth-last-child" _) = Left "invalid argument to :nth-last-child"
 
-    renderConstraint (PseudoFunc "nth-last-of-type" OddArg) = "(position() mod 2) = 1"
-    renderConstraint (PseudoFunc "nth-last-of-type" EvenArg) = "(position() mod 2) = 0"
-    renderConstraint (PseudoFunc "nth-last-of-type" (ANPlusBArg a b)) = nthOfTypeMod a b
-    renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = nthOfTypeMod 1 b
-    renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = nthOfTypeMod a 0
+    renderConstraint (PseudoFunc "nth-of-type" OddArg) = return "(position() mod 2) = 1"
+    renderConstraint (PseudoFunc "nth-of-type" EvenArg) = return "(position() mod 2) = 0"
+    renderConstraint (PseudoFunc "nth-of-type" (ANPlusBArg a b)) = return $ nthOfTypeMod a b
+    renderConstraint (PseudoFunc "nth-of-type" (NPlusBArg b)) = return $ nthOfTypeMod 1 b
+    renderConstraint (PseudoFunc "nth-of-type" (ANArg a)) = return $ nthOfTypeMod a 0
+    renderConstraint (PseudoFunc "nth-of-type" _) = Left "invalid argument to :nth-of-type"
 
-    renderConstraint (PseudoClass "first-of-type") = "position() = 1"
-    renderConstraint (PseudoClass "last-of-type") = "position() = 1"
-    renderConstraint (PseudoClass "first-child" ) = "count(preceding-sibling::*) = 0";
-    renderConstraint (PseudoClass "last-child" ) = "count(following-sibling::*) = 0";
-    renderConstraint (PseudoClass "only-child" ) = "count(preceding-sibling::*) = 0 and count(following-sibling::*) = 0";
-    renderConstraint (PseudoClass "only-of-type" ) = "last() = 1";
-    renderConstraint (PseudoClass "empty" ) = "not(node())";
+    renderConstraint (PseudoFunc "nth-last-of-type" OddArg) = return "(position() mod 2) = 1"
+    renderConstraint (PseudoFunc "nth-last-of-type" EvenArg) = return "(position() mod 2) = 0"
+    renderConstraint (PseudoFunc "nth-last-of-type" (ANPlusBArg a b)) = return $ nthOfTypeMod a b
+    renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = return $ nthOfTypeMod 1 b
+    renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = return $ nthOfTypeMod a 0
+    renderConstraint (PseudoFunc "nth-last-of-type" _) = Left "invalid argument to :nth-last-of-type"
+    renderConstraint (PseudoFunc sel _) = Left $ T.concat [ "unkown pseudo func :", sel ]
+
+    renderConstraint (PseudoClass "first-of-type") = return "position() = 1"
+    renderConstraint (PseudoClass "last-of-type") = return "position() = last()"
+    renderConstraint (PseudoClass "first-child") = return "count(preceding-sibling::*) = 0"
+    renderConstraint (PseudoClass "last-child") = return "count(following-sibling::*) = 0"
+    renderConstraint (PseudoClass "only-child") = return "count(preceding-sibling::*) = 0 and count(following-sibling::*) = 0"
+    renderConstraint (PseudoClass "only-of-type") = return "last() = 1"
+    renderConstraint (PseudoClass "empty") = return "not(node())"
+    renderConstraint (PseudoClass sel) = Left $ T.concat [ "unkown pseudo class :", sel ]
 
     nthOfTypeMod a b
         | a == (-1) = T.concat [ "(position() <= ", int2txt b, ") and (((position() - ", int2txt b, ") mod 1) = 0)" ]
@@ -107,6 +139,9 @@ fromCSS sels =
     identOrStringToString (StringLit lit) = lit
     renderStr    x   = stringLiteral $ identOrStringToString x
     renderStr' l x r = stringLiteral $ T.concat [ l, identOrStringToString x, r ]
+
+-- The following XPaths were generated from the Ruby 'xpath' gem.
+-- See: https://gist.github.com/cstrahan/10015991
 
 link :: Text -> Bool -> Text
 link locator exact =
