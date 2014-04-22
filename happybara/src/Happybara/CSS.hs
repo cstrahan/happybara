@@ -38,12 +38,13 @@ data FuncArg = ANPlusBArg Int Int
              | ANArg Int
              | EvenArg
              | OddArg
-             | SelectorArg Selector
+             | SelectorArg Selector -- TODO: This can really only be a consraint or elment type
              | NoArg
              deriving (Eq, Show)
 
 type Element = Text
 
+-- TODO: consider moving Element into Constraint
 data Constraint = Class Text
                 | ID Text
                 | HasAttribute Ident

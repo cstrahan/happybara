@@ -132,6 +132,10 @@ fromCSS prefix css = do
     renderConstraint (PseudoClass "only-child") = return "count(preceding-sibling::*) = 0 and count(following-sibling::*) = 0"
     renderConstraint (PseudoClass "only-of-type") = return "last() = 1"
     renderConstraint (PseudoClass "empty") = return "not(node())"
+    renderConstraint (PseudoClass "link") = return "local-name()='a' and ./@href"
+    renderConstraint (PseudoClass "disabled") = return "(local-name()='textarea' or local-name()='input') and ./@disabled"
+    renderConstraint (PseudoClass "checked") = return "./@checked and (local-name()='option' or (local-name()='input' and (./@type='radio' or ./@type='checkbox'))) "
+    renderConstraint (PseudoClass "selected") = return "./@selected"
     renderConstraint (PseudoClass sel) = Left $ T.concat [ "unknown pseudo class :", sel ]
 
     nthChild a b
@@ -140,7 +144,7 @@ fromCSS prefix css = do
         | otherwise = T.concat [ "(count(preceding-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
 
     nthLastChild a b
-        | a < 0     = T.concat [ "(count(following-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and (count(preceding-sibling::*) + 1) <= ", int2txt b ]
+        | a < 0     = T.concat [ "(count(following-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and (count(following-sibling::*) + 1) <= ", int2txt b ]
         | a == 0    = T.concat [ "(count(following-sibling::*) + 1) = ", int2txt b ]
         | otherwise = T.concat [ "(count(following-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
 
