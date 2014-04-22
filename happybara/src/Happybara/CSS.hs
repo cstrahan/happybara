@@ -16,7 +16,7 @@ module Happybara.CSS
     , selectors
     ) where
 
-import           Control.Applicative           hiding (many)
+import           Control.Applicative           hiding (many, optional)
 import           Control.Monad
 
 import           Data.Monoid
@@ -110,7 +110,7 @@ constraint =
         mkAttr "^=" = AttributeStartsWith
         mkAttr "$=" = AttributeEndsWith
 
-element :: Parser Text
+element :: Parser Element
 element =
     ident <|> (string "*" *> return "*")
 
@@ -130,20 +130,33 @@ pseudo = do
               return $ PseudoFunc i a
       where
         sels = SelectorArg <$> selector
-        args = (try $ anPlusB <* sp <* char ')')
+        args = (try $ nth <* sp <* char ')')
            <|> (try $ sels <* sp <* char ')')
 
-anPlusB :: Parser FuncArg
-anPlusB = do
-    odd <|> even <|> try negnpb <|> try anpb <|> try an <|> npb
+-- http://dev.w3.org/csswg/selectors3/#nth-child-pseudo
+nth :: Parser FuncArg
+nth = do
+    odd <|> even <|> try an_anpb <|> npb <?> "nth"
   where
     odd    = string "odd" *> return OddArg
     even   = string "even" *> return EvenArg
-    negnpb = ANPlusBArg <$> (string "-n+" *> return (-1)) <*> (posInteger)
-    anpb   = ANPlusBArg <$> (integer <* char 'n') <*> (sp *> char '+' *> sp *> posInteger)
-    an     = ANArg <$> (integer <* char 'n')
-    npb    = NPlusBArg <$> posInteger
-
+    an_anpb = do
+        asign <- option '+' (oneOf "+-")
+        anum <- option 1 integer <* char 'n' <* sp
+        let a | asign == '-' = (-anum)
+              | otherwise    =   anum
+        mb <- optionMaybe $ do
+            sign <- (oneOf "+-") <* sp
+            num <- integer
+            return $ if sign == '-' then (-num) else num
+        return $ maybe (ANArg a) (ANPlusBArg a) mb
+    npb = do
+        bsign <- option '+' (oneOf "+-")
+        bnum <- integer
+        let b | bsign == '-' = (-bnum)
+              | otherwise    =   bnum
+        return $ NPlusBArg b
+    integer = read <$> many1 digit
 
 ident :: Parser Text
 ident = do
@@ -171,15 +184,6 @@ str =
                <|> string "\\")
         char '"'
         return . T.pack . read $ "\"" <> concat s <> "\""
-
-integer :: Parser Int
-integer = negInteger <|> posInteger
-
-negInteger :: Parser Int
-negInteger = char '-' *> (negate <$> posInteger)
-
-posInteger :: Parser Int
-posInteger = read <$> many digit
 
 tryConsume :: Stream s m t => ParsecT s u m a -> ParsecT s u m Bool
 tryConsume p =

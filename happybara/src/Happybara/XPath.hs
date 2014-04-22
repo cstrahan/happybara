@@ -84,7 +84,7 @@ fromCSS prefix css = do
     renderConstraint (AttributeContains attr val) = return $ T.concat [ "contains(./@", attr, ", ", renderStr val, ")" ]
     renderConstraint (AttributeDoesNotContain attr val) = return $ T.concat [ "not(contains(./@", attr, ", ", renderStr val, "))" ]
     renderConstraint (AttributeContainsWord attr val) = return $ T.concat [ "contains(concat(' ', normalize-space(./@", attr, "), ' '), ", renderStr' " " val " ", ")" ]
-    renderConstraint (AttributeContainsPrefix attr val) = return $ T.concat [ "starts-with(./@", attr, ", ", renderStr' "" val "-", ")" ]
+    renderConstraint (AttributeContainsPrefix attr val) = return $ T.concat [ "./@", attr, " = ", renderStr val, " or starts-with(./@", attr, ", ", renderStr' "" val "-", ")" ]
     renderConstraint (AttributeStartsWith attr val) = return $ T.concat [ "starts-with(./@", attr, ", ", renderStr val, ")" ]
     renderConstraint (AttributeEndsWith attr val) = return $ T.concat [ "ends-with(./@", attr, ", ", renderStr val, ")" ]
 
@@ -96,24 +96,32 @@ fromCSS prefix css = do
     renderConstraint (PseudoFunc "has" (SelectorArg sel)) = renderSelector sel
     renderConstraint (PseudoFunc "has" _) = Left "invalid argument to :has"
 
-    renderConstraint (PseudoFunc "nth-child" (NPlusBArg b)) = return $ T.concat [ "count(preceding-sibling::*) = ", int2txt (b-1) ]
+    renderConstraint (PseudoFunc "nth-child" EvenArg) = return $ nthChild 2 0
+    renderConstraint (PseudoFunc "nth-child" OddArg) = return $ nthChild 2 1
+    renderConstraint (PseudoFunc "nth-child" (ANPlusBArg a b)) = return $ nthChild a b
+    renderConstraint (PseudoFunc "nth-child" (NPlusBArg b)) = return $ nthChild 0 b
+    renderConstraint (PseudoFunc "nth-child" (ANArg a)) = return $ nthChild a 0
     renderConstraint (PseudoFunc "nth-child" _) = Left "invalid argument to :nth-child"
 
-    renderConstraint (PseudoFunc "nth-last-child" (NPlusBArg b)) = return $ T.concat [ "count(following-sibling::*) = ", int2txt (b-1) ]
+    renderConstraint (PseudoFunc "nth-last-child" EvenArg) = return $ nthLastChild 2 0
+    renderConstraint (PseudoFunc "nth-last-child" OddArg) = return $ nthLastChild 2 1
+    renderConstraint (PseudoFunc "nth-last-child" (ANPlusBArg a b)) = return $ nthLastChild a b
+    renderConstraint (PseudoFunc "nth-last-child" (NPlusBArg b)) = return $ nthLastChild 0 b
+    renderConstraint (PseudoFunc "nth-last-child" (ANArg a)) = return $ nthLastChild a 0
     renderConstraint (PseudoFunc "nth-last-child" _) = Left "invalid argument to :nth-last-child"
 
-    renderConstraint (PseudoFunc "nth-of-type" OddArg) = return "(position() mod 2) = 1"
-    renderConstraint (PseudoFunc "nth-of-type" EvenArg) = return "(position() mod 2) = 0"
-    renderConstraint (PseudoFunc "nth-of-type" (ANPlusBArg a b)) = return $ nthOfTypeMod a b
-    renderConstraint (PseudoFunc "nth-of-type" (NPlusBArg b)) = return $ nthOfTypeMod 1 b
-    renderConstraint (PseudoFunc "nth-of-type" (ANArg a)) = return $ nthOfTypeMod a 0
+    renderConstraint (PseudoFunc "nth-of-type" EvenArg) = return $ nthOfType 2 0
+    renderConstraint (PseudoFunc "nth-of-type" OddArg) = return $ nthOfType 2 1
+    renderConstraint (PseudoFunc "nth-of-type" (ANPlusBArg a b)) = return $ nthOfType a b
+    renderConstraint (PseudoFunc "nth-of-type" (NPlusBArg b)) = return $ nthOfType 0 b
+    renderConstraint (PseudoFunc "nth-of-type" (ANArg a)) = return $ nthOfType a 0
     renderConstraint (PseudoFunc "nth-of-type" _) = Left "invalid argument to :nth-of-type"
 
-    renderConstraint (PseudoFunc "nth-last-of-type" OddArg) = return "(position() mod 2) = 1"
-    renderConstraint (PseudoFunc "nth-last-of-type" EvenArg) = return "(position() mod 2) = 0"
-    renderConstraint (PseudoFunc "nth-last-of-type" (ANPlusBArg a b)) = return $ nthLastOfTypeMod a b
-    renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = return $ nthLastOfTypeMod 1 b
-    renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = return $ nthLastOfTypeMod a 0
+    renderConstraint (PseudoFunc "nth-last-of-type" EvenArg) = return $ nthLastOfType 2 0
+    renderConstraint (PseudoFunc "nth-last-of-type" OddArg) = return $ nthLastOfType 2 1
+    renderConstraint (PseudoFunc "nth-last-of-type" (ANPlusBArg a b)) = return $ nthLastOfType a b
+    renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = return $ nthLastOfType 0 b
+    renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = return $ nthLastOfType a 0
     renderConstraint (PseudoFunc "nth-last-of-type" _) = Left "invalid argument to :nth-last-of-type"
     renderConstraint (PseudoFunc sel _) = Left $ T.concat [ "unknown pseudo func :", sel ]
 
@@ -126,15 +134,29 @@ fromCSS prefix css = do
     renderConstraint (PseudoClass "empty") = return "not(node())"
     renderConstraint (PseudoClass sel) = Left $ T.concat [ "unknown pseudo class :", sel ]
 
-    nthOfTypeMod a b
-        | a == (-1) = T.concat [ "(position() <= ", int2txt b, ") and (((position() - ", int2txt b, ") mod 1) = 0)" ]
-        | b > 0     = T.concat [ "(position() >= ", int2txt b, ") and (((position() - ", int2txt b, ") mod ", int2txt a, ") = 0)" ]
-        | otherwise = T.concat [ "(position() mod ", int2txt a, ") = 0" ]
+    nthChild a b
+        | a < 0     = T.concat [ "(count(preceding-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and (count(preceding-sibling::*) + 1) <= ", int2txt b ]
+        | a == 0    = T.concat [ "(count(preceding-sibling::*) + 1) = ", int2txt b ]
+        | otherwise = T.concat [ "(count(preceding-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
 
-    nthLastOfTypeMod a b
-        | a == (-1) = T.concat [ "((last() - position() + 1) <= ", int2txt b, ") and ((((last() - position() + 1) - ", int2txt b, ") mod 1) = 0)" ]
-        | b > 0     = T.concat [ "((last() - position() + 1) >= ", int2txt b, ") and ((((last() - position() + 1) - ", int2txt b, ") mod ", int2txt a, ") = 0)" ]
-        | otherwise = T.concat [ "((last() - position() + 1) mod ", int2txt a, ") = 0" ]
+    nthLastChild a b
+        | a < 0     = T.concat [ "(count(following-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and (count(preceding-sibling::*) + 1) <= ", int2txt b ]
+        | a == 0    = T.concat [ "(count(following-sibling::*) + 1) = ", int2txt b ]
+        | otherwise = T.concat [ "(count(following-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
+
+    nthOfType a b
+        | a < 0     = T.concat [ "(position() ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and position() <= ", int2txt b ]
+        | a == 0    = T.concat [ "(position() = ", int2txt b, ")" ]
+        | otherwise = T.concat [ "(position() ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
+
+    nthLastOfType a b
+        | a < 0     = T.concat [ "(last() - position() + 1 ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and (last() - position() + 1) <= ", int2txt b ]
+        | a == 0    = T.concat [ "(last() - position() + 1) = ", int2txt b ]
+        | otherwise = T.concat [ "(last() - position() + 1 ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
+
+    addOrSubtract n
+        | n < 0     = "- " <> int2txt (abs n)
+        | otherwise = "+ " <> int2txt n
 
     int2txt i = T.pack $ show (i::Int)
     identOrStringToString (Ident i) = i
