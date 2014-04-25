@@ -55,6 +55,9 @@ import           Happybara.Query
 fromQ :: (ToQuery tq sess m) => tq -> HappybaraT sess m (Node sess)
 fromQ = findOrFail . toQuery
 
+sync :: HM sess m => IO a -> HappybaraT sess m a
+sync = synchronize . liftBase
+
 -- | Set the current element scope to the element given by the query.
 within :: (ToQuery tq sess m) => tq -> HappybaraT sess m a -> HappybaraT sess m a
 within queryish act = do
@@ -72,110 +75,110 @@ allText :: (ToQuery tq sess m) => tq -> HappybaraT sess m Text
 allText queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.allText driver node
+    sync $ D.allText driver node
 
 visibleText :: (ToQuery tq sess m) => tq -> HappybaraT sess m Text
 visibleText queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.visibleText driver node
+    sync $ D.visibleText driver node
 
 attr :: (ToQuery tq sess m) => tq -> Text -> HappybaraT sess m (Maybe Text)
 attr queryish name = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.attr driver node name
+    sync $ D.attr driver node name
 
 getValue :: (ToQuery tq sess m) => tq -> HappybaraT sess m NodeValue
 getValue queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.getValue driver node
+    sync $ D.getValue driver node
 
 setValue :: (ToQuery tq sess m) => tq -> NodeValue -> HappybaraT sess m ()
 setValue queryish val = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.setValue driver node val
+    sync $ D.setValue driver node val
 
 selectOption :: (ToQuery tq sess m) => tq -> HappybaraT sess m ()
 selectOption queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.selectOption driver node
+    sync $ D.selectOption driver node
 
 unselectOption :: (ToQuery tq sess m) => tq -> HappybaraT sess m ()
 unselectOption queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.unselectOption driver node
+    sync $ D.unselectOption driver node
 
 click :: (ToQuery tq sess m) => tq -> HappybaraT sess m ()
 click queryish = do
-    node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.click driver node
+    node <- fromQ queryish
+    sync $ D.click driver node
 
 rightClick :: (ToQuery tq sess m) => tq -> HappybaraT sess m ()
 rightClick queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.rightClick driver node
+    sync $ D.rightClick driver node
 
 doubleClick :: (ToQuery tq sess m) => tq -> HappybaraT sess m ()
 doubleClick queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.doubleClick driver node
+    sync $ D.doubleClick driver node
 
 hover :: (ToQuery tq sess m) => tq -> HappybaraT sess m ()
 hover queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.hover driver node
+    sync $ D.hover driver node
 
 dragTo :: (ToQuery tq sess m) => tq -> tq -> HappybaraT sess m ()
 dragTo queryish1 queryish2 = do
     node1 <- fromQ queryish1
     node2 <- fromQ queryish2
     driver <- getDriver
-    liftBase $ D.dragTo driver node1 node2
+    sync $ D.dragTo driver node1 node2
 
 tagName :: (ToQuery tq sess m) => tq -> HappybaraT sess m Text
 tagName queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.tagName driver node
+    sync $ D.tagName driver node
 
 isVisible :: (ToQuery tq sess m) => tq -> HappybaraT sess m Bool
 isVisible queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.isVisible driver node
+    sync $ D.isVisible driver node
 
 isChecked :: (ToQuery tq sess m) => tq -> HappybaraT sess m Bool
 isChecked queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.isChecked driver node
+    sync $ D.isChecked driver node
 
 isSelected :: (ToQuery tq sess m) => tq -> HappybaraT sess m Bool
 isSelected queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.isSelected driver node
+    sync $ D.isSelected driver node
 
 isDisabled :: (ToQuery tq sess m) => tq -> HappybaraT sess m Bool
 isDisabled queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.isDisabled driver node
+    sync $ D.isDisabled driver node
 
 path :: (ToQuery tq sess m) => tq -> HappybaraT sess m Text
 path queryish = do
     node <- fromQ queryish
     driver <- getDriver
-    liftBase $ D.path driver node
+    sync $ D.path driver node
 
 trigger :: (ToQuery tq sess m) => tq -> Text -> HappybaraT sess m ()
 trigger queryish event = do
@@ -189,7 +192,7 @@ queryish1 <==> queryish2 = do
     node1 <- fromQ queryish1
     node2 <- fromQ queryish2
     driver <- getDriver
-    liftBase $ D.nodeEq driver node1 node2
+    sync $ D.nodeEq driver node1 node2
 
 infix 4 </=>
 (</=>) :: (ToQuery tq sess m) => tq -> tq -> HappybaraT sess m Bool
