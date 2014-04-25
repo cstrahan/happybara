@@ -123,24 +123,24 @@ fromCSS prefix css = do
     renderConstraint (PseudoClass sel) = Left $ T.concat [ "unknown pseudo class :", sel ]
 
     nthChild a b
-        | a < 0     = T.concat [ "(count(preceding-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and (count(preceding-sibling::*) + 1) <= ", int2txt b ]
-        | a == 0    = T.concat [ "(count(preceding-sibling::*) + 1) = ", int2txt b ]
-        | otherwise = T.concat [ "(count(preceding-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
+        | a < 0     = T.concat [ "(count(preceding-sibling::*) ", addOrSubtract (-b-1), ") mod ", int2txt (abs a), " = 0 and count(preceding-sibling::*) <= ", int2txt (b-1) ]
+        | a == 0    = T.concat [ "(count(preceding-sibling::*)) = ", int2txt (b-1) ]
+        | otherwise = T.concat [ "(count(preceding-sibling::*) ", addOrSubtract (-b-1), ") mod ", int2txt a, " = 0" ]
 
     nthLastChild a b
-        | a < 0     = T.concat [ "(count(following-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and (count(following-sibling::*) + 1) <= ", int2txt b ]
-        | a == 0    = T.concat [ "(count(following-sibling::*) + 1) = ", int2txt b ]
-        | otherwise = T.concat [ "(count(following-sibling::*) + 1 ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
+        | a < 0     = T.concat [ "(count(following-sibling::*) ", addOrSubtract (-b-1), ") mod ", int2txt (abs a), " = 0 and count(following-sibling::*) <= ", int2txt (b-1) ]
+        | a == 0    = T.concat [ "(count(following-sibling::*)) = ", int2txt (b-1) ]
+        | otherwise = T.concat [ "(count(following-sibling::*) ", addOrSubtract (-b-1), ") mod ", int2txt a, " = 0" ]
 
     nthOfType a b
         | a < 0     = T.concat [ "(position() ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and position() <= ", int2txt b ]
-        | a == 0    = T.concat [ "(position() = ", int2txt b, ")" ]
+        | a == 0    = T.concat [ "position() = ", int2txt b ]
         | otherwise = T.concat [ "(position() ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
 
     nthLastOfType a b
-        | a < 0     = T.concat [ "(last() - position() + 1 ", addOrSubtract (-b), ") mod ", int2txt (abs a), " = 0 and (last() - position() + 1) <= ", int2txt b ]
-        | a == 0    = T.concat [ "(last() - position() + 1) = ", int2txt b ]
-        | otherwise = T.concat [ "(last() - position() + 1 ", addOrSubtract (-b), ") mod ", int2txt a, " = 0" ]
+        | a < 0     = T.concat [ "(last() - position() ", addOrSubtract (-b-1), ") mod ", int2txt (abs a), " = 0 and (last() - position()) <= ", int2txt (b-1) ]
+        | a == 0    = T.concat [ "(last() - position()) = ", int2txt (b-1) ]
+        | otherwise = T.concat [ "(last() - position() ", addOrSubtract (-b-1), ") mod ", int2txt a, " = 0" ]
 
     addOrSubtract n
         | n < 0     = "- " <> int2txt (abs n)
