@@ -69,12 +69,12 @@ selector =
     chainl1 simpleSelector parseOp
   where
     parseOp = do
-        mop <- (sp *> (optionMaybe $ oneOf "+~>") <* sp)
-        return $ case mop of
-                     Just '+' -> AdjacentSibling
-                     Just '~' -> PreviousSibling
-                     Just '>' -> ImmediateChild
-                     _        -> Descendent
+        op <- (sp *> (option ' ' $ oneOf "+~>") <* sp)
+        return $ case op of
+                     '+' -> AdjacentSibling
+                     '~' -> PreviousSibling
+                     '>' -> ImmediateChild
+                     ' ' -> Descendent
 
 simpleSelector :: Parser Selector
 simpleSelector = SimpleSelector <$> (Just <$> element) <*> many constraint
