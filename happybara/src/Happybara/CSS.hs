@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 -- |
 -- Copyright :  (c) Charles Strahan 2014
@@ -9,15 +9,16 @@
 module Happybara.CSS
     ( Selector(..)
     , FuncArg(..)
-    , Element(..)
+    , Element
     , Constraint(..)
-    , Ident(..)
+    , Ident
     , IdentOrString(..)
     , selectors
     ) where
 
+import           Prelude                       hiding (even, odd)
+
 import           Control.Applicative           hiding (many, optional)
-import           Control.Monad
 
 import           Data.Monoid
 import           Data.Text                     (Text)
@@ -34,17 +35,12 @@ data Selector = SimpleSelector (Maybe Element) [Constraint]
               deriving (Eq, Show)
 
 data FuncArg = ANPlusBArg Int Int
-             | NPlusBArg Int
-             | ANArg Int
-             | EvenArg
-             | OddArg
-             | SelectorArg Selector -- TODO: This can really only be a consraint or elment type
+             | SelectorArg Selector
              | NoArg
              deriving (Eq, Show)
 
 type Element = Text
 
--- TODO: consider moving Element into Constraint
 data Constraint = Class Text
                 | ID Text
                 | HasAttribute Ident
@@ -136,27 +132,26 @@ pseudo = do
 
 -- http://dev.w3.org/csswg/selectors3/#nth-child-pseudo
 nth :: Parser FuncArg
-nth = do
-    odd <|> even <|> try an_anpb <|> npb <?> "nth"
+nth = even <|> odd <|> try an_anpb <|> npb <?> "nth"
   where
-    odd    = string "odd" *> return OddArg
-    even   = string "even" *> return EvenArg
+    even   = string "even" *> (return $ ANPlusBArg 2 0)
+    odd    = string "odd" *> (return $ ANPlusBArg 2 1)
     an_anpb = do
         asign <- option '+' (oneOf "+-")
         anum <- option 1 integer <* char 'n' <* sp
         let a | asign == '-' = (-anum)
               | otherwise    =   anum
-        mb <- optionMaybe $ do
+        b <- option 0 $ do
             sign <- (oneOf "+-") <* sp
             num <- integer
             return $ if sign == '-' then (-num) else num
-        return $ maybe (ANArg a) (ANPlusBArg a) mb
+        return $ ANPlusBArg a b
     npb = do
         bsign <- option '+' (oneOf "+-")
         bnum <- integer
         let b | bsign == '-' = (-bnum)
               | otherwise    =   bnum
-        return $ NPlusBArg b
+        return $ ANPlusBArg 0 b
     integer = read <$> many1 digit
 
 ident :: Parser Text

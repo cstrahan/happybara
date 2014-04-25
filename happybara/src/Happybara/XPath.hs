@@ -96,32 +96,16 @@ fromCSS prefix css = do
     renderConstraint (PseudoFunc "has" (SelectorArg sel)) = renderSelector sel
     renderConstraint (PseudoFunc "has" _) = Left "invalid argument to :has"
 
-    renderConstraint (PseudoFunc "nth-child" EvenArg) = return $ nthChild 2 0
-    renderConstraint (PseudoFunc "nth-child" OddArg) = return $ nthChild 2 1
     renderConstraint (PseudoFunc "nth-child" (ANPlusBArg a b)) = return $ nthChild a b
-    renderConstraint (PseudoFunc "nth-child" (NPlusBArg b)) = return $ nthChild 0 b
-    renderConstraint (PseudoFunc "nth-child" (ANArg a)) = return $ nthChild a 0
     renderConstraint (PseudoFunc "nth-child" _) = Left "invalid argument to :nth-child"
 
-    renderConstraint (PseudoFunc "nth-last-child" EvenArg) = return $ nthLastChild 2 0
-    renderConstraint (PseudoFunc "nth-last-child" OddArg) = return $ nthLastChild 2 1
     renderConstraint (PseudoFunc "nth-last-child" (ANPlusBArg a b)) = return $ nthLastChild a b
-    renderConstraint (PseudoFunc "nth-last-child" (NPlusBArg b)) = return $ nthLastChild 0 b
-    renderConstraint (PseudoFunc "nth-last-child" (ANArg a)) = return $ nthLastChild a 0
     renderConstraint (PseudoFunc "nth-last-child" _) = Left "invalid argument to :nth-last-child"
 
-    renderConstraint (PseudoFunc "nth-of-type" EvenArg) = return $ nthOfType 2 0
-    renderConstraint (PseudoFunc "nth-of-type" OddArg) = return $ nthOfType 2 1
     renderConstraint (PseudoFunc "nth-of-type" (ANPlusBArg a b)) = return $ nthOfType a b
-    renderConstraint (PseudoFunc "nth-of-type" (NPlusBArg b)) = return $ nthOfType 0 b
-    renderConstraint (PseudoFunc "nth-of-type" (ANArg a)) = return $ nthOfType a 0
     renderConstraint (PseudoFunc "nth-of-type" _) = Left "invalid argument to :nth-of-type"
 
-    renderConstraint (PseudoFunc "nth-last-of-type" EvenArg) = return $ nthLastOfType 2 0
-    renderConstraint (PseudoFunc "nth-last-of-type" OddArg) = return $ nthLastOfType 2 1
     renderConstraint (PseudoFunc "nth-last-of-type" (ANPlusBArg a b)) = return $ nthLastOfType a b
-    renderConstraint (PseudoFunc "nth-last-of-type" (NPlusBArg b)) = return $ nthLastOfType 0 b
-    renderConstraint (PseudoFunc "nth-last-of-type" (ANArg a)) = return $ nthLastOfType a 0
     renderConstraint (PseudoFunc "nth-last-of-type" _) = Left "invalid argument to :nth-last-of-type"
     renderConstraint (PseudoFunc sel _) = Left $ T.concat [ "unknown pseudo func :", sel ]
 

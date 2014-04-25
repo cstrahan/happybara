@@ -99,7 +99,7 @@ instance (HM sess m) => ToQuery (Query sess m) sess m where
 
 composePredicates :: (HM sess m) => [Node sess -> HappybaraT sess m Bool] -> (Node sess -> HappybaraT sess m Bool)
 composePredicates predicates node =
-    allM (\p -> p node) predicates
+    allM ($ node) predicates
   where
     allM _ []     = return True
     allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
