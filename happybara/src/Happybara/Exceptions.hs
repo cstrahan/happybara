@@ -7,6 +7,21 @@
 -- Maintainer:  Charles Strahan <charles.c.strahan@gmail.com>
 -- Stability :  experimental
 --
+--
+-- Happybara uses the following heirarchy of exceptions to communicate failures:
+--
+-- @
+-- 'HappybaraException'
+-- └── 'InvalidElementException'
+--     ├── 'ExpectationNotMetException'
+--     ├── 'ElementNotFoundException'
+--     └── 'AmbiguousElementException'
+-- @
+--
+-- To handle the asynchronicity inherant in sites that use JavaScript, Happybara
+-- will retry your requests. Behind the scenes, 'Happybara.Monad.synchronize'
+-- will catch any exception of type 'InvalidElementException' (or subclass
+-- thereof) and retry according to the associated docs.
 module Happybara.Exceptions where
 
 import           Control.Exception

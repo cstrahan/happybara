@@ -39,13 +39,13 @@ stringLiteral str =
 
 fromCSS :: Text -> Text -> Either Text Text
 fromCSS prefix css = do
-    ast <- parse $ T.unpack css
+    ast <- parse css
     sels <- mapM (renderSelector) ast
     return $ if T.null prefix
                then T.intercalate " | " sels
                else prefix <> T.intercalate (" | "<>prefix) sels
   where
-    parse txt = fromEither $ runParser selectors () "" txt
+    parse = fromEither . parseCSS
       where
         fromEither (Right x) = Right x
         fromEither (Left msg) = Left $ T.concat [ "css parse error: ", T.pack $ show msg ]

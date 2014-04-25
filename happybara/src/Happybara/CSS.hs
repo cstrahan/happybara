@@ -6,14 +6,16 @@
 -- License   :  MIT
 -- Maintainer:  Charles Strahan <charles.c.strahan@gmail.com>
 -- Stability :  experimental
+--
+-- Internal support for parsing CSS selectors.
 module Happybara.CSS
-    ( Selector(..)
-    , FuncArg(..)
-    , Element
-    , Constraint(..)
+    ( Element
     , Ident
+    , Selector(..)
+    , FuncArg(..)
+    , Constraint(..)
     , IdentOrString(..)
-    , selectors
+    , parseCSS
     ) where
 
 import           Prelude                       hiding (even, odd)
@@ -41,8 +43,8 @@ data FuncArg = ANPlusBArg Int Int
 
 type Element = Text
 
-data Constraint = Class Text
-                | ID Text
+data Constraint = Class Ident
+                | ID Ident
                 | HasAttribute Ident
                 | AttributeEquals Ident IdentOrString
                 | AttributeContains Ident IdentOrString
@@ -60,6 +62,9 @@ type Ident = Text
 data IdentOrString = Ident Text
                    | StringLit Text
                    deriving (Eq, Show)
+
+parseCSS :: Text -> Either ParseError [Selector]
+parseCSS txt = runParser selectors () "" $ T.unpack txt
 
 selectors :: Parser [Selector]
 selectors = selector `sepBy` (sp *> char ',' *> sp)

@@ -70,9 +70,8 @@ mkXPathQuery ty locator xpathGen predicates =
             Inexact -> do
                 find $ xpathGen locator False
   where
-    find xpath = do
-        res <- M.findXPath xpath
-        filterM (composePredicates predicates) res
+    find xpath =
+        M.findXPath xpath >>= filterM (composePredicates predicates)
 
 -- $queries
 -- Happybara includes a number of queries for common cases where you want to

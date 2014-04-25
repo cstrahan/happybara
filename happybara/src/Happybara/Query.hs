@@ -45,7 +45,7 @@ import qualified Happybara.XPath             as X
 -- welcome to implement your own 'Query' instances, thus extending the DSL.
 --
 -- Queries are scoped to the current node as given by 'M.getCurrentNode', and
--- a new scope can be specified via 'within'.
+-- a new scope can be specified via 'Happybara.Node.within'.
 --
 -- Note that the behavior of a query is dependent on the current 'M.Exactness' setting:
 --
